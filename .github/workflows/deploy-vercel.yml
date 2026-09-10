@@ -1,0 +1,23 @@
+name: Deploy Vercel
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy production
+        if: env.VERCEL_TOKEN != ''
+        run: npx --yes vercel@latest --prod --yes --token="$VERCEL_TOKEN" --scope=killjoy00s-projects
+      - name: Note unavailable token
+        if: env.VERCEL_TOKEN == ''
+        run: echo "VERCEL_TOKEN is not available to this repository; deployment skipped."
