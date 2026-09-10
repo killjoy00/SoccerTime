@@ -3,7 +3,7 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        { source: "/data/epl-live.json", destination: "/api/catalog" },
+        { source: "/data/epl.json", destination: "/api/catalog" },
       ],
       afterFiles: [],
       fallback: [],
