@@ -26,6 +26,16 @@ const current =
   bootstrap.events.find((event) => !event.finished) ||
   bootstrap.events.at(-1);
 const currentEvent = current?.id || 1;
+const events = bootstrap.events.map((event) => ({
+  id: event.id,
+  name: event.name,
+  deadline: event.deadline_time,
+  finished: Boolean(event.finished),
+  dataChecked: Boolean(event.data_checked),
+  isCurrent: Boolean(event.is_current),
+  isNext: Boolean(event.is_next),
+}));
+const finishedEvents = events.filter((event) => event.finished && event.dataChecked).map((event) => event.id);
 
 const playableEvents = bootstrap.events
   .filter((event) => event.finished || event.is_current)
@@ -88,6 +98,8 @@ const output = {
   provider: "official-fpl-public-api",
   updatedAt: new Date().toISOString(),
   currentEvent,
+  events,
+  finishedEvents,
   players,
   fixtures,
   scores,
