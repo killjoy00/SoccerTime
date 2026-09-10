@@ -19,8 +19,13 @@ jobs:
       - name: Sync API-Football
         env:
           SOCCER_API_KEY: ${{ secrets.SOCCER_API_KEY }}
+          SOCCER_API: ${{ secrets.SOCCER_API }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
+          API_SPORTS_KEY: ${{ secrets.API_SPORTS_KEY }}
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          X_RAPIDAPI_KEY: ${{ secrets.X_RAPIDAPI_KEY }}
         run: node scripts/sync-football.mjs
       - name: Commit refreshed data
         run: |
