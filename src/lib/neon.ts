@@ -1,0 +1,2 @@
+const API="https://ep-icy-resonance-aw87iron.apirest.c-12.us-east-1.aws.neon.tech/neondb/rest/v1";
+export async function rpc(name:string,body:Record<string,unknown>){const r=await fetch(`${API}/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});if(!r.ok)throw new Error(`Database ${r.status}`);return r.json()}
