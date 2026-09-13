@@ -15,7 +15,7 @@ returns jsonb
 language sql
 security definer
 set search_path to 'api','auth','public'
-as 'select case when not api.is_soccertime_workload() then jsonb_build_object(''ok'',false,''error'',''Unauthorized'') when not exists(select 1 from api.leagues l where l.join_code=p_code) then jsonb_build_object(''ok'',false,''error'',''League not found'') else jsonb_build_object(''ok'',true,''moves'',coalesce((select jsonb_agg(jsonb_build_object(''id'',rm.id,''gameweek'',rm.gameweek,''manager_id'',rm.manager_id,''dropped_player_name'',dropped.name,''added_player_name'',added.name,''moved_at'',rm.moved_at) order by rm.moved_at desc) from api.roster_moves rm left join api.players dropped on dropped.api_id=rm.dropped_player_id left join api.players added on added.api_id=rm.added_player_id where rm.league_id=(select id from api.leagues where l.join_code=p_code)),''[]''::jsonb)) end';
+as 'select case when not api.is_soccertime_workload() then jsonb_build_object(''ok'',false,''error'',''Unauthorized'') when not exists(select 1 from api.leagues l where l.join_code=p_code) then jsonb_build_object(''ok'',false,''error'',''League not found'') else jsonb_build_object(''ok'',true,''moves'',coalesce((select jsonb_agg(jsonb_build_object(''id'',rm.id,''gameweek'',rm.gameweek,''manager_id'',rm.manager_id,''dropped_player_name'',dropped.name,''added_player_name'',added.name,''moved_at'',rm.moved_at) order by rm.moved_at desc) from api.roster_moves rm left join api.players dropped on dropped.api_id=rm.dropped_player_id left join api.players added on added.api_id=rm.added_player_id where rm.league_id=(select id from api.leagues where join_code=p_code)),''[]''::jsonb)) end';
 
 create or replace function api.league_state_by_id(p_league_id uuid)
 returns jsonb
