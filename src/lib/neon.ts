@@ -1,10 +1,10 @@
 const ALLOWED = new Set([
   "league_state",
+  "roster_moves_state",
   "draft_pick",
   "set_captain",
   "pickup_player",
   "save_manager",
-  "finalize_gameweek",
 ]);
 
 export async function rpc(name: string, body: Record<string, unknown>) {
