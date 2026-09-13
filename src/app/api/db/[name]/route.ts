@@ -1,32 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import { neonRpc } from "@/lib/neon-server";
 
-const API = "https://ep-icy-resonance-aw87iron.apirest.c-12.us-east-1.aws.neon.tech/neondb/rest/v1";
-const ALLOWED = new Set([
-  "league_state",
-  "draft_pick",
-  "set_captain",
-  "pickup_player",
-  "save_manager",
-  "finalize_gameweek",
-]);
-const GAMEWEEK_LOCKED_ACTIONS = new Set(["set_captain", "pickup_player"]);
 const FPL = "https://fantasy.premierleague.com/api";
+const RPC_NAMES: Record<string, string> = {
+  league_state: "league_state_workload",
+  draft_pick: "draft_pick_workload",
+  set_captain: "set_captain_workload",
+  pickup_player: "pickup_player_workload",
+  save_manager: "save_manager_workload",
+};
+const GAMEWEEK_LOCKED_ACTIONS = new Set(["set_captain", "pickup_player"]);
 
 async function fplJson(path: string) {
   const response = await fetch(`${FPL}${path}`, {
     headers: { "user-agent": "SoccerTime family fantasy app" },
     cache: "no-store",
   });
-  if (!response.ok) throw new Error(`FPL ${path} ${response.status}`);
+  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
   return response.json();
 }
 
 async function hasGameweekStarted(gameweek: unknown) {
   const gw = Number(gameweek);
-  if (!Number.isInteger(gw) || gw < 1 || gw > 38) {
-    throw new Error("Invalid Gameweek");
-  }
-
+  if (!Number.isInteger(gw) || gw < 1 || gw > 38) throw new Error("Invalid Gameweek");
   const fixtures = (await fplJson("/fixtures/")) as Array<{
     event: number | null;
     kickoff_time: string | null;
@@ -34,36 +30,28 @@ async function hasGameweekStarted(gameweek: unknown) {
   }>;
   const gameweekFixtures = fixtures.filter((fixture) => Number(fixture.event) === gw);
   if (!gameweekFixtures.length) throw new Error("No Gameweek fixtures found");
-
   return gameweekFixtures.some((fixture) =>
     fixture.started === true ||
     Boolean(fixture.kickoff_time && Date.parse(fixture.kickoff_time) <= Date.now()),
   );
 }
 
-async function verifiedPickupBody(body: Record<string, unknown>) {
-  const playerId = Number(body.p_add_player_id);
+async function verifiedPlayerBody(name: string, body: Record<string, unknown>) {
+  const idField = name === "pickup_player" ? "p_add_player_id" : "p_player_id";
+  const playerId = Number(body[idField]);
   if (!Number.isInteger(playerId) || playerId <= 0) throw new Error("Invalid player");
-
   const bootstrap = await fplJson("/bootstrap-static/") as {
     elements: Array<{id:number;web_name:string;team:number;element_type:number;status:string}>;
     teams: Array<{id:number;name:string}>;
     element_types: Array<{id:number;singular_name_short:string}>;
   };
   const player = bootstrap.elements.find((item) => item.id === playerId);
-  if (!player || player.status === "u") throw new Error("Player is not available for pickup");
+  if (!player || player.status === "u") throw new Error("Player is not available");
   const positionRaw = bootstrap.element_types.find((item) => item.id === player.element_type)?.singular_name_short;
   const position = positionRaw === "GKP" ? "GK" : positionRaw;
   const team = bootstrap.teams.find((item) => item.id === player.team)?.name;
   if (!position || !team) throw new Error("Could not verify player metadata");
-
-  return {
-    ...body,
-    p_name: player.web_name,
-    p_position: position,
-    p_team_name: team,
-    p_photo: null,
-  };
+  return {...body,p_name:player.web_name,p_position:position,p_team_name:team,p_photo:null};
 }
 
 export async function POST(
@@ -71,72 +59,37 @@ export async function POST(
   context: { params: Promise<{ name: string }> },
 ) {
   const { name } = await context.params;
-
-  if (!ALLOWED.has(name)) {
-    return NextResponse.json({ error: "Unsupported database action" }, { status: 404 });
-  }
+  const rpcName = RPC_NAMES[name];
+  if (!rpcName) return NextResponse.json({ error: "Unsupported database action" }, { status: 404 });
 
   let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
 
-  if (GAMEWEEK_LOCKED_ACTIONS.has(name)) {
-    try {
-      if (await hasGameweekStarted(body.p_gameweek)) {
-        const action = name === "set_captain" ? "Captain" : "Pickups";
-        return NextResponse.json(
-          { error: `Gameweek ${body.p_gameweek} has started. ${action} are locked.` },
-          { status: 409 },
-        );
-      }
-      if (name === "pickup_player") body = await verifiedPickupBody(body);
-    } catch (error) {
-      console.error("Could not verify Gameweek action", error);
-      return NextResponse.json(
-        { error: error instanceof Error && error.message.includes("Player") ? error.message : "Could not verify the Gameweek lock. Try again shortly." },
-        { status: 503 },
-      );
+  try {
+    if (GAMEWEEK_LOCKED_ACTIONS.has(name) && await hasGameweekStarted(body.p_gameweek)) {
+      const action = name === "set_captain" ? "Captain" : "Pickups";
+      return NextResponse.json({ error: `Gameweek ${body.p_gameweek} has started. ${action} are locked.` }, { status: 409 });
     }
+    if (name === "draft_pick" || name === "pickup_player") body = await verifiedPlayerBody(name, body);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not verify request" }, { status: 503 });
   }
 
   const oidcToken = request.headers.get("x-vercel-oidc-token");
-  if (!oidcToken) {
-    return NextResponse.json({ error: "Missing Vercel workload identity" }, { status: 503 });
-  }
+  if (!oidcToken) return NextResponse.json({ error: "Missing workload identity" }, { status: 503 });
 
   try {
-    const response = await fetch(`${API}/rpc/${name}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Profile": "api",
-        "Accept-Profile": "api",
-        "Authorization": `Bearer ${oidcToken}`,
-      },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-
-    const text = await response.text();
-    const contentType = response.headers.get("content-type") || "application/json";
-
-    if (!response.ok) {
-      console.error("Neon RPC failed", {
-        name,
-        status: response.status,
-        body: text.slice(0, 1000),
-      });
+    const result = await neonRpc(oidcToken, rpcName, body);
+    if (!result.ok) {
+      console.error("Neon workload RPC failed", { name, status: result.status, body: result.text.slice(0, 1000) });
     }
-
-    return new Response(text, {
-      status: response.status,
-      headers: { "content-type": contentType },
+    return new Response(result.text, {
+      status: result.status,
+      headers: { "content-type": result.contentType },
     });
   } catch (error) {
-    console.error("Neon RPC network failure", name, error);
+    console.error("Neon workload RPC network failure", name, error);
     return NextResponse.json({ error: "Database connection failed" }, { status: 502 });
   }
 }
