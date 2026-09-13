@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { neonRpc } from "@/lib/neon-server";
 
 const FPL = "https://fantasy.premierleague.com/api";
-const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
 const EXPECTED_SCHEDULE = "0 6 * * *";
 
 async function fplJson(path: string) {
@@ -44,7 +43,7 @@ export async function GET(request: NextRequest) {
     const finalized: Array<{gameweek:number;manager1:number;manager2:number}> = [];
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const stateResult = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
+      const stateResult = await neonRpc(oidcToken, "soccertime_state", {});
       if (!stateResult.ok || !stateResult.payload?.ok) throw new Error(stateResult.payload?.error || "League state unavailable");
       const state = stateResult.payload;
       const gameweek = Number(state.league?.active_gameweek);
@@ -62,8 +61,7 @@ export async function GET(request: NextRequest) {
       const manager1 = scoreBySlot(state, scores, 1);
       const manager2 = scoreBySlot(state, scores, 2);
 
-      const finalize = await neonRpc(oidcToken, "finalize_gameweek_by_id", {
-        p_league_id: LEAGUE_ID,
+      const finalize = await neonRpc(oidcToken, "finalize_soccertime_gameweek", {
         p_gameweek: gameweek,
         p_manager1_score: manager1,
         p_manager2_score: manager2,
