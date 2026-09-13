@@ -1,2 +1,33 @@
-const API="https://ep-icy-resonance-aw87iron.apirest.c-12.us-east-1.aws.neon.tech/neondb/rest/v1";
-export async function rpc(name:string,body:Record<string,unknown>){const r=await fetch(`${API}/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});if(!r.ok)throw new Error(`Database ${r.status}`);return r.json()}
+const ALLOWED = new Set([
+  "league_state",
+  "draft_pick",
+  "set_captain",
+  "save_manager",
+  "finalize_gameweek",
+]);
+
+export async function rpc(name: string, body: Record<string, unknown>) {
+  if (!ALLOWED.has(name)) throw new Error("Unsupported database action");
+
+  const response = await fetch(`/api/db/${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const text = await response.text();
+  let payload: any = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const detail = payload?.message || payload?.error || text || "Database request failed";
+    throw new Error(`Database ${response.status}: ${detail}`);
+  }
+
+  return payload;
+}
