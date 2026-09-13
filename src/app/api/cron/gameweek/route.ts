@@ -3,7 +3,7 @@ import { neonRpc } from "@/lib/neon-server";
 
 const FPL = "https://fantasy.premierleague.com/api";
 const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
-const EXPECTED_SCHEDULE = "*/30 * * * *";
+const EXPECTED_SCHEDULE = "0 6 * * *";
 
 async function fplJson(path: string) {
   const response = await fetch(`${FPL}${path}`, {
