@@ -44,6 +44,10 @@ export default function Home(){
   const [query,setQuery]=useState("");
   const [pos,setPos]=useState("ALL");
   const [finalizing,setFinalizing]=useState(false);
+  const [now,setNow]=useState(()=>Date.now());
+  const [replacePick,setReplacePick]=useState<any>(null);
+  const [pickupQuery,setPickupQuery]=useState("");
+  const [moving,setMoving]=useState(false);
 
   const load=useCallback(async(c:string,selectedSlot:number)=>{
     try{
@@ -66,6 +70,11 @@ export default function Home(){
     if(savedCode)load(savedCode,savedSlot);
   },[load]);
 
+  useEffect(()=>{
+    const id=window.setInterval(()=>setNow(Date.now()),30000);
+    return()=>window.clearInterval(id);
+  },[]);
+
   const managers=state?.managers||[];
   const me=managers.find((m:any)=>m.slot===slot);
   const opponent=managers.find((m:any)=>m.slot!==slot);
@@ -78,6 +87,15 @@ export default function Home(){
   const roundNo=Number(state?.draft?.round_no||1);
   const roundStart=Number(state?.draft?.start_gameweek||gw);
   const roundEnd=Number(state?.draft?.end_gameweek||Math.min(gw+3,38));
+
+  const gwFixtures=data.fixtures.filter(f=>Number(f.event)===gw);
+  const kickoffTimes=gwFixtures.map(f=>f.kickoff?Date.parse(f.kickoff):NaN).filter(Number.isFinite);
+  const firstKickoff=kickoffTimes.length?Math.min(...kickoffTimes):null;
+  const lockKnown=gwFixtures.some(f=>f.started)||firstKickoff!==null;
+  const gameweekLocked=gwFixtures.some(f=>f.started)||(firstKickoff!==null&&now>=firstKickoff);
+  const lineupLocked=!lockKnown||gameweekLocked;
+  const draftComplete=state?.draft?.status==="complete";
+  const pickupLocked=!draftComplete||lineupLocked;
 
   const refreshLive=useCallback(async()=>{
     if(!state?.ok)return;
@@ -136,7 +154,18 @@ export default function Home(){
     .filter(player=>!drafted.has(player.id))
     .filter(player=>pos==="ALL"||player.position===pos)
     .filter(player=>!query||`${player.name} ${player.firstName||""} ${player.lastName||""} ${player.team}`.toLowerCase().includes(query.toLowerCase()))
-    .sort((a,b)=>b.total-a.total||b.form!-a.form!),[data.players,drafted,pos,query]);
+    .sort((a,b)=>b.total-a.total||Number(b.form||0)-Number(a.form||0)),[data.players,picks,pos,query]);
+
+  const pickupOptions=useMemo(()=>{
+    if(!replacePick)return [];
+    return data.players
+      .filter(player=>player.status!=="u")
+      .filter(player=>player.position===replacePick.position)
+      .filter(player=>!drafted.has(player.id))
+      .filter(player=>!pickupQuery||`${player.name} ${player.firstName||""} ${player.lastName||""} ${player.team}`.toLowerCase().includes(pickupQuery.toLowerCase()))
+      .sort((a,b)=>b.total-a.total||Number(b.form||0)-Number(a.form||0))
+      .slice(0,100);
+  },[data.players,picks,pickupQuery,replacePick]);
 
   const nextFixtures=useCallback((player:Player)=>{
     if(!player.teamId)return "";
@@ -158,11 +187,39 @@ export default function Home(){
 
   async function captain(pick:any){
     setMsg("");
+    if(lineupLocked){setMsg(gameweekLocked?`Gameweek ${gw} has started. Captain is locked.`:"Waiting for the fixture schedule before captain changes are allowed.");return;}
     try{
       const result=await rpc("set_captain",{p_code:code,p_slot:slot,p_gameweek:gw,p_player_id:pick.player_id});
       if(!result.ok)setMsg(result.error);
       await load(code,slot);
     }catch(error:any){setMsg(error.message||"Captain update failed")}
+  }
+
+  async function pickup(player:Player){
+    if(!replacePick||moving)return;
+    setMsg("");
+    if(pickupLocked){setMsg(gameweekLocked?`Gameweek ${gw} has started. Pickups are locked.`:"Pickups are not open yet.");return;}
+    const droppedWasCaptain=(state?.captains||[]).some((c:any)=>c.manager_id===replacePick.manager_id&&c.player_id===replacePick.player_id);
+    setMoving(true);
+    try{
+      const result=await rpc("pickup_player",{
+        p_code:code,
+        p_slot:slot,
+        p_gameweek:gw,
+        p_drop_player_id:replacePick.player_id,
+        p_add_player_id:player.id,
+        p_name:player.name,
+        p_position:player.position,
+        p_team_name:player.team,
+        p_photo:player.photo||null,
+      });
+      if(!result.ok){setMsg(result.error||"Pickup failed");return;}
+      setReplacePick(null);
+      setPickupQuery("");
+      await load(code,slot);
+      setMsg(droppedWasCaptain?`${player.name} added. Your former captain was dropped, so choose a new captain before kickoff.`:`${player.name} added to your squad.`);
+    }catch(error:any){setMsg(error.message||"Pickup failed")}
+    finally{setMoving(false)}
   }
 
   async function saveManager(managerSlot:number,name:string,clubName:string){
@@ -204,14 +261,25 @@ export default function Home(){
           <div className="card stat"><span className="tiny">ROUND {roundNo}</span><b>GW {roundStart}–{roundEnd}</b><span className="sub">Redraft after {roundEnd}</span></div>
         </div>
         {state?.draft?.status==="open"&&<div className="banner">Round {roundNo} draft is open. {picks.length}/16 picks complete.</div>}
-        <Fixtures fixtures={data.fixtures.filter(f=>f.event===gw)}/>
+        <Fixtures fixtures={gwFixtures}/>
         <Roster title={me?.club_name} picks={mine} scoreFor={scoreFor} caps={state.captains}/>
         <Roster title={opponent?.club_name} picks={theirs} scoreFor={scoreFor} caps={state.captains}/>
       </>}
 
       {tab==="squad"&&<>
-        <h2>{me?.club_name}</h2><p className="sub">All eight players score each Gameweek. Your captain scores double.</p>
-        <Roster title="Your squad" picks={mine} scoreFor={scoreFor} caps={state.captains} captain={captain}/>
+        <h2>{me?.club_name}</h2>
+        <p className="sub">All eight players score each Gameweek. Your captain scores double.</p>
+        <div className={`banner ${gameweekLocked?"error":""}`}>
+          {gameweekLocked?`Gameweek ${gw} is live. Captain and pickups are locked.`:lockKnown&&firstKickoff?`Captain and pickups lock at the first kickoff: ${new Date(firstKickoff).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"})}.`:"Checking the Gameweek kickoff time. Captain and pickups stay locked until it is verified."}
+        </div>
+        <Roster title="Your squad" picks={mine} scoreFor={scoreFor} caps={state.captains} captain={captain} captainLocked={lineupLocked} replace={pick=>{setReplacePick(pick);setPickupQuery("")}} pickupLocked={pickupLocked}/>
+        {replacePick&&<section className="card">
+          <div className="eyebrow">Free agent pickup · {replacePick.position}</div>
+          <h3>Replace {replacePick.player_name}</h3>
+          <p className="sub">Pick an unowned {replacePick.position}. The swap keeps your roster at 1 GK · 2 DEF · 3 MID · 2 FWD. If you drop your captain, you must choose a new one before kickoff.</p>
+          <div className="filters"><input value={pickupQuery} onChange={e=>setPickupQuery(e.target.value)} placeholder={`Search available ${replacePick.position}s`}/><button className="btn secondary" onClick={()=>{setReplacePick(null);setPickupQuery("")}}>Cancel</button></div>
+          {pickupOptions.length?pickupOptions.map(player=><div className="row" key={player.id}><div className="grow"><div className="name">{player.name}{player.status&&player.status!=="a"?" ⚠":""}</div><div className="meta">{player.team} · {player.total} pts · form {player.form??0}</div><div className="tiny">{player.news||nextFixtures(player)}</div></div><button className="btn" disabled={pickupLocked||moving} onClick={()=>pickup(player)}>{moving?"Working…":"Add"}</button></div>):<div className="empty">No matching free agents.</div>}
+        </section>}
         <section className="card"><div className="eyebrow">Round schedule</div>{mine.length?mine.map((pick:any)=>{const player=data.players.find(p=>p.id===pick.player_id);return <div className="row" key={pick.player_id}><div className="grow"><div className="name">{pick.player_name}</div><div className="meta">{player?nextFixtures(player):"Fixtures loading"}</div></div></div>}):<div className="empty">Draft your Round {roundNo} squad first.</div>}</section>
       </>}
 
@@ -230,6 +298,31 @@ export default function Home(){
       {tab==="league"&&<>
         <h2>Season table</h2>
         <section className="card">{[...managers].sort((a:any,b:any)=>b.table_points-a.table_points||Number(b.fantasy_points)-Number(a.fantasy_points)).map((manager:any,index:number)=><div className="row" key={manager.id}><div className="pts">{index+1}</div><div className="grow"><div className="name">{manager.club_name}</div><div className="meta">{manager.wins}W · {manager.draws}D · {manager.losses}L · {manager.fantasy_points} fantasy pts</div></div><div className="pts">{manager.table_points}</div></div>)}</section>
+        <h2>Scoring & rules</h2>
+        <section className="card">
+          <div className="eyebrow">SoccerTime scoring</div>
+          <h3>Official FPL points, house-league format</h3>
+          <p className="sub">SoccerTime uses the official Fantasy Premier League live total for every player. All eight drafted players score; there is no bench. Your captain scores 2×.</p>
+          <RuleRow name="Appearance" detail="Up to 60 min · 60+ min" value="1 · 2"/>
+          <RuleRow name="Goal" detail="GK · DEF · MID · FWD" value="10 · 6 · 5 · 4"/>
+          <RuleRow name="Assist" detail="Each FPL assist" value="+3"/>
+          <RuleRow name="Clean sheet" detail="GK/DEF · MID" value="+4 · +1"/>
+          <RuleRow name="Goalkeeper" detail="Every 3 saves · penalty save" value="+1 · +5"/>
+          <RuleRow name="Defensive contributions" detail="DEF at 10 CBIT · MID/FWD at 12 CBIRT" value="+2"/>
+          <RuleRow name="Bonus" detail="Top BPS performers" value="+1 to +3"/>
+          <RuleRow name="Deductions" detail="Penalty miss · yellow · red · own goal" value="-2 · -1 · -3 · -2"/>
+          <RuleRow name="Goals conceded" detail="GK/DEF, every 2 conceded" value="-1"/>
+        </section>
+        <section className="card">
+          <div className="eyebrow">House rules</div>
+          <RuleRow name="Roster" detail="All active, no bench" value="1 GK · 2 DEF · 3 MID · 2 FWD"/>
+          <RuleRow name="Captain" detail="One per manager, doubles that player's FPL total" value="2×"/>
+          <RuleRow name="Lock" detail="Captain and pickups lock at the first Premier League kickoff of the Gameweek" value="Kickoff"/>
+          <RuleRow name="Free agents" detail="After the draft, swap an owned player for an unowned player at the same position before lock" value="Unlimited"/>
+          <RuleRow name="Ownership" detail="A player can belong to only one manager in the round" value="Exclusive"/>
+          <RuleRow name="Weekly table" detail="Head-to-head win · draw · loss" value="3 · 1 · 0"/>
+          <RuleRow name="Rounds" detail="Fresh snake draft after every four Gameweeks" value="4 GWs"/>
+        </section>
         <h2>Round champions</h2>
         <section className="card">{(state.round_results||[]).length?(state.round_results||[]).map((result:any)=>{const winner=managers.find((m:any)=>m.slot===result.winner_slot);return <div className="row" key={result.round_no}><div className="pts">🏆</div><div className="grow"><div className="name">Round {result.round_no}: {winner?.club_name||"Shared"}</div><div className="meta">{result.manager1_wins}–{result.manager2_wins} in weekly wins · {result.manager1_points}–{result.manager2_points} fantasy pts</div></div></div>}):<div className="empty">Your first Round champion will appear after GW {roundEnd}.</div>}</section>
         <h2>Match history</h2>
@@ -244,8 +337,12 @@ export default function Home(){
   </>;
 }
 
-function Roster({title,picks,scoreFor,caps,captain}:{title:string;picks:any[];scoreFor:(p:any)=>number;caps:any[];captain?:(p:any)=>void}){
-  return <section className="card"><h3>{title}</h3>{picks.length===0?<div className="empty">No players drafted yet.</div>:picks.map(p=>{const isCaptain=caps?.some((c:any)=>c.manager_id===p.manager_id&&c.player_id===p.player_id);return <div className="row" key={p.pick_no}><div className="grow"><div className="name">{p.player_name} {isCaptain&&"©"}</div><div className="meta"><span className="pos">{p.position}</span>{p.team_name} · Pick {p.pick_no}</div></div><div className="pts">{scoreFor(p)}</div>{captain&&<button className="btn secondary" onClick={()=>captain(p)}>{isCaptain?"Captain":"Make C"}</button>}</div>})}</section>;
+function Roster({title,picks,scoreFor,caps,captain,captainLocked=false,replace,pickupLocked=false}:{title:string;picks:any[];scoreFor:(p:any)=>number;caps:any[];captain?:(p:any)=>void;captainLocked?:boolean;replace?:(p:any)=>void;pickupLocked?:boolean}){
+  return <section className="card"><h3>{title}</h3>{picks.length===0?<div className="empty">No players drafted yet.</div>:picks.map(p=>{const isCaptain=caps?.some((c:any)=>c.manager_id===p.manager_id&&c.player_id===p.player_id);return <div className="row" key={p.pick_no}><div className="grow"><div className="name">{p.player_name} {isCaptain&&"©"}</div><div className="meta"><span className="pos">{p.position}</span>{p.team_name} · Pick {p.pick_no}</div></div><div className="pts">{scoreFor(p)}</div>{(captain||replace)&&<div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>{captain&&<button className="btn secondary" disabled={captainLocked} onClick={()=>captain(p)}>{isCaptain?"Captain":"Make C"}</button>}{replace&&<button className="btn secondary" disabled={pickupLocked} onClick={()=>replace(p)}>Swap</button>}</div>}</div>})}</section>;
+}
+
+function RuleRow({name,detail,value}:{name:string;detail:string;value:string}){
+  return <div className="row"><div className="grow"><div className="name">{name}</div><div className="meta">{detail}</div></div><div style={{fontWeight:900,textAlign:"right",maxWidth:"45%"}}>{value}</div></div>;
 }
 
 function Fixtures({fixtures}:{fixtures:Fixture[]}){

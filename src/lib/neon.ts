@@ -2,6 +2,7 @@ const ALLOWED = new Set([
   "league_state",
   "draft_pick",
   "set_captain",
+  "pickup_player",
   "save_manager",
   "finalize_gameweek",
 ]);
