@@ -10,6 +10,16 @@ const ALLOWED = new Set([
   "finalize_gameweek",
 ]);
 const GAMEWEEK_LOCKED_ACTIONS = new Set(["set_captain", "pickup_player"]);
+const FPL = "https://fantasy.premierleague.com/api";
+
+async function fplJson(path: string) {
+  const response = await fetch(`${FPL}${path}`, {
+    headers: { "user-agent": "SoccerTime family fantasy app" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`FPL ${path} ${response.status}`);
+  return response.json();
+}
 
 async function hasGameweekStarted(gameweek: unknown) {
   const gw = Number(gameweek);
@@ -17,13 +27,7 @@ async function hasGameweekStarted(gameweek: unknown) {
     throw new Error("Invalid Gameweek");
   }
 
-  const response = await fetch("https://fantasy.premierleague.com/api/fixtures/", {
-    headers: { "user-agent": "SoccerTime family fantasy app" },
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`FPL fixtures ${response.status}`);
-
-  const fixtures = (await response.json()) as Array<{
+  const fixtures = (await fplJson("/fixtures/")) as Array<{
     event: number | null;
     kickoff_time: string | null;
     started: boolean;
@@ -35,6 +39,31 @@ async function hasGameweekStarted(gameweek: unknown) {
     fixture.started === true ||
     Boolean(fixture.kickoff_time && Date.parse(fixture.kickoff_time) <= Date.now()),
   );
+}
+
+async function verifiedPickupBody(body: Record<string, unknown>) {
+  const playerId = Number(body.p_add_player_id);
+  if (!Number.isInteger(playerId) || playerId <= 0) throw new Error("Invalid player");
+
+  const bootstrap = await fplJson("/bootstrap-static/") as {
+    elements: Array<{id:number;web_name:string;team:number;element_type:number;status:string}>;
+    teams: Array<{id:number;name:string}>;
+    element_types: Array<{id:number;singular_name_short:string}>;
+  };
+  const player = bootstrap.elements.find((item) => item.id === playerId);
+  if (!player || player.status === "u") throw new Error("Player is not available for pickup");
+  const positionRaw = bootstrap.element_types.find((item) => item.id === player.element_type)?.singular_name_short;
+  const position = positionRaw === "GKP" ? "GK" : positionRaw;
+  const team = bootstrap.teams.find((item) => item.id === player.team)?.name;
+  if (!position || !team) throw new Error("Could not verify player metadata");
+
+  return {
+    ...body,
+    p_name: player.web_name,
+    p_position: position,
+    p_team_name: team,
+    p_photo: null,
+  };
 }
 
 export async function POST(
@@ -63,10 +92,11 @@ export async function POST(
           { status: 409 },
         );
       }
+      if (name === "pickup_player") body = await verifiedPickupBody(body);
     } catch (error) {
-      console.error("Could not verify Gameweek lock", error);
+      console.error("Could not verify Gameweek action", error);
       return NextResponse.json(
-        { error: "Could not verify the Gameweek lock. Try again shortly." },
+        { error: error instanceof Error && error.message.includes("Player") ? error.message : "Could not verify the Gameweek lock. Try again shortly." },
         { status: 503 },
       );
     }
