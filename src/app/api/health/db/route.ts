@@ -3,6 +3,8 @@ import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
 
 export const dynamic = "force-dynamic";
 
+const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
+
 export async function GET() {
   if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") {
     return NextResponse.json({ ok: false, stage: "environment" }, { status: 403 });
@@ -12,7 +14,7 @@ export async function GET() {
   if (!oidcToken) return NextResponse.json({ ok: false, stage: "identity" }, { status: 503 });
 
   try {
-    const result = await neonRpc(oidcToken, "soccertime_state", {});
+    const result = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
     if (!result.ok || !result.payload?.ok) {
       console.error("SoccerTime DB health RPC failed", {
         status: result.status,
