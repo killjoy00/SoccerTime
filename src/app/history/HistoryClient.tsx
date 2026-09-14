@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import BottomNav from "../BottomNav";
 import { rpc } from "@/lib/neon";
 
 type Manager = {
@@ -133,11 +134,11 @@ export default function HistoryClient() {
   );
 
   if (loading) {
-    return <main className="shell historyShell"><HistoryHeader /><section className="card empty">Loading rivalry history…</section></main>;
+    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" /></>;
   }
 
   if (error || !state?.ok) {
-    return <main className="shell historyShell"><HistoryHeader /><section className="card"><div className="banner error">{error || state?.error || "History unavailable."}</div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main>;
+    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">▥</div><b>History is not ready yet</b><span>{error || state?.error || "History unavailable."}</span></div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main><BottomNav active="history" /></>;
   }
 
   const biggestMargin = stats.biggest ? Math.abs(number(stats.biggest.manager1_score) - number(stats.biggest.manager2_score)) : 0;
@@ -151,7 +152,7 @@ export default function HistoryClient() {
         : club(manager2, "Manager 2")
     : "—";
 
-  return <main className="shell historyShell">
+  return <><main className="shell historyShell">
     <HistoryHeader />
 
     <section className="card historyHero">
@@ -188,7 +189,7 @@ export default function HistoryClient() {
             <div className="meta">Weekly wins {round.manager1_wins}–{round.manager2_wins} · Fantasy points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
           </div>
         </div>;
-      }) : <div className="empty">The first Round champion will be crowned after GW {roundEnd || 7}.</div>}
+      }) : <div className="emptyState"><div className="emptyIcon" aria-hidden="true">🏆</div><b>No Round champion yet</b><span>The first champion will be crowned after GW {roundEnd || 7}.</span></div>}
     </section>
 
     <h2>Gameweek scorecards</h2>
@@ -206,11 +207,9 @@ export default function HistoryClient() {
           </div>
           <div className="meta">Margin {Math.abs(score1 - score2)} · Combined {score1 + score2}</div>
         </article>;
-      }) : <section className="card empty">No completed Gameweeks yet. GW {activeGameweek || 4} will appear here automatically after official FPL data is checked and SoccerTime finalizes the result.</section>}
+      }) : <section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">⚽</div><b>No completed Gameweeks yet</b><span>GW {activeGameweek || 4} will appear here automatically after official FPL data is checked and SoccerTime finalizes the result.</span></div></section>}
     </section>
-
-    <Link className="btn secondary historyHomeBtn" href="/">Back to SoccerTime</Link>
-  </main>;
+  </main><BottomNav active="history" /></>;
 }
 
 function HistoryHeader() {
@@ -219,4 +218,8 @@ function HistoryHeader() {
 
 function RecordRow({ label, value, detail }: { label: string; value: string; detail: string }) {
   return <div className="row"><div className="grow"><div className="name">{label}</div><div className="meta">{detail}</div></div><div className="historyRecordValue">{value}</div></div>;
+}
+
+function HistorySkeleton(){
+  return <div className="skeletonList" aria-label="Loading rivalry history"><span className="srOnly">Loading rivalry history</span>{Array.from({length:5},(_,i)=><div className="skeletonRow" key={i}><div className="skeletonAvatar"/><div className="skeletonGrow"><div className="skeletonLine wide"/><div className="skeletonLine short"/></div><div className="skeletonScore"/></div>)}</div>;
 }
