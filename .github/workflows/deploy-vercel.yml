@@ -45,3 +45,17 @@ jobs:
 
       - name: Deploy prebuilt artifact
         run: npx --yes vercel@${VERCEL_CLI_VERSION} deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN" --scope=killjoy00s-projects
+
+      - name: Verify production health
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            echo "Production health check attempt ${attempt}/6"
+            if response="$(curl --fail-with-body --silent --show-error https://soccer-time-sigma.vercel.app/api/health/e2e 2>&1)"; then
+              echo "$response"
+              exit 0
+            fi
+            echo "$response"
+            sleep 5
+          done
+          echo "::error::Production health check failed after deployment."
+          exit 1
