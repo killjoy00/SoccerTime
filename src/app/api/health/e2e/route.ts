@@ -4,6 +4,7 @@ import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
 export const dynamic = "force-dynamic";
 
 const FPL = "https://fantasy.premierleague.com/api";
+const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
 const QUOTAS: Record<string, number> = { GK: 1, DEF: 2, MID: 3, FWD: 2 };
 
 async function fplJson(path: string) {
@@ -44,7 +45,7 @@ export async function GET() {
   if (!oidcToken) return NextResponse.json({ ok: false, stage: "identity" }, { status: 503 });
 
   try {
-    const stateResult = await neonRpc(oidcToken, "soccertime_state", {});
+    const stateResult = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
     if (!stateResult.ok || !stateResult.payload?.ok) {
       return NextResponse.json({ ok: false, stage: "state", rpcStatus: stateResult.status }, { status: 503 });
     }
