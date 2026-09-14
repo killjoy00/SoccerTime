@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { neonRpc } from "@/lib/neon-server";
+import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
 
 const FPL = "https://fantasy.premierleague.com/api";
 const EXPECTED_SCHEDULE = "0 6 * * *";
@@ -26,12 +26,17 @@ function scoreBySlot(state: any, scores: Record<string, number>, slot: number) {
 }
 
 export async function GET(request: NextRequest) {
+  if (process.env.VERCEL_ENV !== "production") {
+    return NextResponse.json({ error: "Production only" }, { status: 403 });
+  }
   if (request.headers.get("x-vercel-cron-schedule") !== EXPECTED_SCHEDULE) {
     return NextResponse.json({ error: "Cron only" }, { status: 401 });
   }
 
-  const oidcToken = request.headers.get("x-vercel-oidc-token");
+  const oidcToken = await getSoccerTimeOidcToken();
   if (!oidcToken) return NextResponse.json({ error: "Missing workload identity" }, { status: 503 });
+
+  console.info("SoccerTime Gameweek cron started", { schedule: EXPECTED_SCHEDULE });
 
   try {
     const bootstrap = await fplJson("/bootstrap-static/") as {
@@ -44,13 +49,28 @@ export async function GET(request: NextRequest) {
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const stateResult = await neonRpc(oidcToken, "soccertime_state", {});
-      if (!stateResult.ok || !stateResult.payload?.ok) throw new Error(stateResult.payload?.error || "League state unavailable");
+      if (!stateResult.ok || !stateResult.payload?.ok) {
+        console.error("SoccerTime cron state RPC failed", {
+          status: stateResult.status,
+          error: stateResult.payload?.error || "unknown",
+        });
+        throw new Error(stateResult.payload?.error || "League state unavailable");
+      }
       const state = stateResult.payload;
       const gameweek = Number(state.league?.active_gameweek);
 
-      if (!confirmed.has(gameweek)) break;
-      if (state.draft?.status !== "complete" || (state.picks || []).length !== 16) break;
-      if (state.matchup?.status === "final") break;
+      if (!confirmed.has(gameweek)) {
+        console.info("SoccerTime Gameweek cron no-op", { gameweek, reason: "FPL not data-checked" });
+        break;
+      }
+      if (state.draft?.status !== "complete" || (state.picks || []).length !== 16) {
+        console.info("SoccerTime Gameweek cron no-op", { gameweek, reason: "draft incomplete" });
+        break;
+      }
+      if (state.matchup?.status === "final") {
+        console.info("SoccerTime Gameweek cron no-op", { gameweek, reason: "already final" });
+        break;
+      }
 
       const live = await fplJson(`/event/${gameweek}/live/`) as {
         elements: Array<{id:number;stats?:{total_points?:number}}>;
@@ -66,10 +86,18 @@ export async function GET(request: NextRequest) {
         p_manager1_score: manager1,
         p_manager2_score: manager2,
       });
-      if (!finalize.ok || !finalize.payload?.ok) throw new Error(finalize.payload?.error || "Finalization failed");
+      if (!finalize.ok || !finalize.payload?.ok) {
+        console.error("SoccerTime cron finalize RPC failed", {
+          gameweek,
+          status: finalize.status,
+          error: finalize.payload?.error || "unknown",
+        });
+        throw new Error(finalize.payload?.error || "Finalization failed");
+      }
       finalized.push({ gameweek, manager1, manager2 });
     }
 
+    console.info("SoccerTime Gameweek cron completed", { finalized });
     return NextResponse.json({ ok: true, finalized });
   } catch (error) {
     console.error("SoccerTime Gameweek cron failed", error);

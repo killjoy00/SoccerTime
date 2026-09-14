@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { neonRpc } from "@/lib/neon-server";
+import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
 
 const FPL = "https://fantasy.premierleague.com/api";
 const RPC_NAMES: Record<string, string> = {
@@ -58,6 +58,10 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ name: string }> },
 ) {
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") {
+    return NextResponse.json({ error: "Database actions are production-only" }, { status: 403 });
+  }
+
   const { name } = await context.params;
   const rpcName = RPC_NAMES[name];
   if (!rpcName) return NextResponse.json({ error: "Unsupported database action" }, { status: 404 });
@@ -76,7 +80,7 @@ export async function POST(
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not verify request" }, { status: 503 });
   }
 
-  const oidcToken = request.headers.get("x-vercel-oidc-token");
+  const oidcToken = await getSoccerTimeOidcToken();
   if (!oidcToken) return NextResponse.json({ error: "Missing workload identity" }, { status: 503 });
 
   try {
