@@ -46,6 +46,23 @@ jobs:
       - name: Deploy prebuilt artifact
         run: npx --yes vercel@${VERCEL_CLI_VERSION} deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN" --scope=killjoy00s-projects
 
+      - name: Progress completed Gameweeks
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            echo "Production Gameweek progression attempt ${attempt}/6"
+            if response="$(curl --fail-with-body --silent --show-error -X POST https://soccer-time-sigma.vercel.app/api/progress 2>&1)"; then
+              echo "$response"
+              if printf '%s' "$response" | node -e 'let s=""; process.stdin.on("data", d => s += d).on("end", () => { try { process.exit(JSON.parse(s).ok === true ? 0 : 1); } catch { process.exit(1); } });'; then
+                exit 0
+              fi
+            else
+              echo "$response"
+            fi
+            sleep 5
+          done
+          echo "::error::Production Gameweek progression failed after deployment."
+          exit 1
+
       - name: Verify production health
         run: |
           for attempt in 1 2 3 4 5 6; do

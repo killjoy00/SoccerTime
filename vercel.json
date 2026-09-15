@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/gameweek",
-      "schedule": "0 1 * * *"
+      "schedule": "30 9 * * *"
     }
   ]
 }
