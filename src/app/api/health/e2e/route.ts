@@ -94,7 +94,7 @@ export async function GET() {
       captainCountOk,
       fplEvent: eventExists,
       fixtures: gwFixtures.length > 0,
-      liveScoring: (live.elements || []).length > 0 && scoresFinite,
+      liveScoring: !gameweekStarted || ((live.elements || []).length > 0 && scoresFinite),
       moveHistory: movesReadable,
     };
     const ok = Object.values(checks).every(Boolean);
