@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { progressSoccerTimeGameweeks } from "@/lib/gameweek-progress";
 
 const FPL = "https://fantasy.premierleague.com/api";
 const RPC_NAMES: Record<string, string> = {
@@ -69,6 +70,13 @@ export async function POST(
   let body: Record<string, unknown>;
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
+
+  if (name === "league_state") {
+    const progress = await progressSoccerTimeGameweeks("app");
+    if (!progress.ok) {
+      console.warn("SoccerTime state read could not run progression check", { error: progress.error });
+    }
+  }
 
   try {
     if (GAMEWEEK_LOCKED_ACTIONS.has(name) && await hasGameweekStarted(body.p_gameweek)) {
