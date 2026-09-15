@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { progressSoccerTimeGameweeks } from "@/lib/gameweek-progress";
 
-const EXPECTED_SCHEDULE = "0 1 * * *";
+const EXPECTED_SCHEDULE = "30 9 * * *";
 
 export async function GET(request: NextRequest) {
   if (process.env.VERCEL_ENV !== "production") {
