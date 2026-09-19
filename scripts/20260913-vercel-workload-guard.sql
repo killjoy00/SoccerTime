@@ -1,6 +1,7 @@
 -- Data API fallback authorization for Vercel OIDC.
 -- The Data API requires a valid JWT from the configured Vercel JWKS/audience.
--- These wrappers additionally require the exact signed production SoccerTime subject.
+-- These wrappers additionally require the exact SoccerTime production Vercel workload
+-- by stable owner/project IDs plus the production environment.
 
 create or replace function api.is_soccertime_workload()
 returns boolean
@@ -8,7 +9,12 @@ language sql
 stable
 security definer
 set search_path to 'api','auth','public'
-as 'select coalesce(auth.user_id(),'''')=''owner:killjoy00s-projects:project:soccer-time:environment:production''';
+as $
+  select coalesce(auth.jwt() ->> 'owner_id', '') = 'team_Ayjs9f3ahL8cNptN9huz7G12'
+     and coalesce(auth.jwt() ->> 'project_id', '') = 'prj_kaof4nw5rxqolfH9FQAN7dRDVXoa'
+     and coalesce(auth.jwt() ->> 'environment', '') = 'production'
+     and coalesce(auth.jwt() ->> 'iss', '') like 'https://oidc.vercel.com%'
+$;
 
 create or replace function api.roster_moves_state(p_code text)
 returns jsonb
