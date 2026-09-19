@@ -5,7 +5,11 @@ const BASE = "https://fantasy.premierleague.com/api";
 
 async function get(path: string) {
   const response = await fetch(`${BASE}${path}`, {
-    headers: { "user-agent": "SoccerTime family fantasy app" },
+    headers: {
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+      "accept": "application/json,text/plain,*/*",
+      "accept-language": "en-US,en;q=0.9",
+    },
     next: { revalidate: 300 },
   });
   if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);

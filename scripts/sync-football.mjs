@@ -36,7 +36,11 @@ function soccerTimeScore(stats = {}, explain = []) {
 
 async function api(path) {
   const response = await fetch(`${BASE}${path}`, {
-    headers: { "user-agent": "SoccerTime family fantasy app" },
+    headers: {
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+      "accept": "application/json,text/plain,*/*",
+      "accept-language": "en-US,en;q=0.9",
+    },
   });
   if (!response.ok) throw new Error(`${path}: ${response.status}`);
   return response.json();
