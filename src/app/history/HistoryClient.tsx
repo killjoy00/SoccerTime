@@ -167,7 +167,7 @@ export default function HistoryClient() {
 
     <div className="grid2 historyStats">
       <div className="card stat"><span className="tiny">SEASON TABLE</span><b>{number(manager1?.table_points)}–{number(manager2?.table_points)}</b><span className="sub">table points</span></div>
-      <div className="card stat"><span className="tiny">FANTASY POINTS</span><b>{number(manager1?.fantasy_points)}–{number(manager2?.fantasy_points)}</b><span className="sub">season total</span></div>
+      <div className="card stat"><span className="tiny">SOCCERTIME POINTS</span><b>{number(manager1?.fantasy_points)}–{number(manager2?.fantasy_points)}</b><span className="sub">season total</span></div>
     </div>
 
     <h2>Records</h2>
@@ -186,7 +186,7 @@ export default function HistoryClient() {
           <div className="historyRoundTrophy">🏆</div>
           <div className="grow">
             <div className="name">Round {round.round_no} · {winner ? club(winner, "Champion") : "Shared"}</div>
-            <div className="meta">Weekly wins {round.manager1_wins}–{round.manager2_wins} · Fantasy points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
+            <div className="meta">Weekly wins {round.manager1_wins}–{round.manager2_wins} · SoccerTime points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
           </div>
         </div>;
       }) : <div className="emptyState"><div className="emptyIcon" aria-hidden="true">🏆</div><b>No Round champion yet</b><span>The first champion will be crowned after GW {roundEnd || 7}.</span></div>}
