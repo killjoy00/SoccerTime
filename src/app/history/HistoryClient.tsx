@@ -38,7 +38,7 @@ type LeagueState = {
   ok: boolean;
   error?: string;
   league?: { active_gameweek?: number };
-  draft?: { round_no?: number; start_gameweek?: number; end_gameweek?: number };
+  draft?: { round_no?: number; start_gameweek?: number; end_gameweek?: number; status?: string };
   managers?: Manager[];
   matchups?: Matchup[];
   round_results?: RoundResult[];
