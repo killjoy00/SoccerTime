@@ -15,13 +15,16 @@ const items: Array<{ id: MainTab; icon: string; label: string }> = [
 export default function BottomNav({
   active,
   onSelect,
+  draftOpen = false,
 }: {
   active: MainTab | "history";
   onSelect?: (tab: MainTab) => void;
+  draftOpen?: boolean;
 }) {
+  const visibleItems = items.filter((item) => item.id !== "draft" || draftOpen);
   return <nav className="bottom" aria-label="SoccerTime navigation">
-    <div className="bottomin">
-      {items.map((item) => onSelect ? (
+    <div className="bottomin" style={{ gridTemplateColumns: `repeat(${visibleItems.length + 1}, 1fr)` }}>
+      {visibleItems.map((item) => onSelect ? (
         <button
           key={item.id}
           type="button"
