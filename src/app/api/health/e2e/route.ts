@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeScore, type FplExplain, type FplScoreStats } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export async function GET() {
     const [bootstrap, fixtures, live] = await Promise.all([
       fplJson("/bootstrap-static/") as Promise<{events:Array<{id:number;finished:boolean;data_checked:boolean}>}>,
       fplJson("/fixtures/") as Promise<Array<{event:number|null;started:boolean;kickoff_time:string|null}>>,
-      fplJson(`/event/${gameweek}/live/`) as Promise<{elements:Array<{id:number;stats?:{total_points?:number}}>}>,
+      fplJson(`/event/${gameweek}/live/`) as Promise<{elements:Array<{id:number;stats?:FplScoreStats;explain?:FplExplain[]}>}>,
     ]);
 
     const gwFixtures = fixtures.filter((fixture) => Number(fixture.event) === gameweek);
@@ -76,7 +77,7 @@ export async function GET() {
     const captainCountOk = !gameweekStarted || (state.captains || []).length === managers.length;
     const eventExists = bootstrap.events.some((event) => event.id === gameweek);
     const liveScores = Object.fromEntries(
-      (live.elements || []).map((element) => [String(element.id), Number(element.stats?.total_points || 0)]),
+      (live.elements || []).map((element) => [String(element.id), soccerTimeScore(element.stats, element.explain)]),
     );
     const scoresFinite = managers.every((manager: any) => Number.isFinite(scoreForManager(state, liveScores, manager.id)));
 
