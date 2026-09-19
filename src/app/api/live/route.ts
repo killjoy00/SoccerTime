@@ -1,17 +1,53 @@
-import {NextRequest,NextResponse} from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { soccerTimeScore, type FplExplain, type FplScoreStats } from "@/lib/scoring";
 
-export const revalidate=60;
+export const dynamic = "force-dynamic";
 
-export async function GET(request:NextRequest){
-  const raw=Number(request.nextUrl.searchParams.get("gw"));
-  const gw=Number.isInteger(raw)&&raw>=1&&raw<=38?raw:null;
-  if(!gw)return NextResponse.json({error:"Invalid gameweek"},{status:400});
-  const response=await fetch(`https://fantasy.premierleague.com/api/event/${gw}/live/`,{
-    headers:{"user-agent":"SoccerTime family fantasy app"},
-    next:{revalidate:60},
+const FPL = "https://fantasy.premierleague.com/api";
+
+async function fplJson(path: string) {
+  const response = await fetch(`${FPL}${path}`, {
+    headers: { "user-agent": "SoccerTime family fantasy app" },
+    cache: "no-store",
   });
-  if(!response.ok)return NextResponse.json({error:"FPL live feed unavailable"},{status:502});
-  const data=await response.json();
-  const scores=Object.fromEntries((data.elements||[]).map((element:any)=>[String(element.id),Number(element.stats?.total_points||0)]));
-  return NextResponse.json({gw,scores,updatedAt:new Date().toISOString()});
+  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
+  return response.json();
+}
+
+export async function GET(request: NextRequest) {
+  const raw = Number(request.nextUrl.searchParams.get("gw"));
+  const gw = Number.isInteger(raw) && raw >= 1 && raw <= 38 ? raw : null;
+  if (!gw) return NextResponse.json({ error: "Invalid gameweek" }, { status: 400 });
+
+  try {
+    const [live, rawFixtures] = await Promise.all([
+      fplJson(`/event/${gw}/live/`) as Promise<{
+        elements: Array<{ id: number; stats?: FplScoreStats; explain?: FplExplain[] }>;
+      }>,
+      fplJson(`/fixtures/?event=${gw}`) as Promise<Array<any>>,
+    ]);
+
+    const scores = Object.fromEntries(
+      (live.elements || []).map((element) => [
+        String(element.id),
+        soccerTimeScore(element.stats, element.explain),
+      ]),
+    );
+
+    const fixtures = rawFixtures.map((fixture) => ({
+      id: Number(fixture.id),
+      event: fixture.event == null ? null : Number(fixture.event),
+      started: Boolean(fixture.started),
+      finished: Boolean(fixture.finished || fixture.finished_provisional),
+      homeGoals: fixture.team_h_score == null ? null : Number(fixture.team_h_score),
+      awayGoals: fixture.team_a_score == null ? null : Number(fixture.team_a_score),
+    }));
+
+    return NextResponse.json({ gw, scores, fixtures, updatedAt: new Date().toISOString() });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "FPL live feed unavailable" },
+      { status: 502 },
+    );
+  }
 }
