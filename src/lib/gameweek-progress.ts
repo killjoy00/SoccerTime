@@ -1,4 +1,5 @@
 import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeScore, type FplExplain, type FplScoreStats } from "@/lib/scoring";
 
 const FPL = "https://fantasy.premierleague.com/api";
 const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
@@ -72,10 +73,10 @@ export async function progressSoccerTimeGameweeks(source: "cron" | "app"): Promi
       }
 
       const live = await fplJson(`/event/${gameweek}/live/`) as {
-        elements: Array<{ id: number; stats?: { total_points?: number } }>;
+        elements: Array<{ id: number; stats?: FplScoreStats; explain?: FplExplain[] }>;
       };
       const scores = Object.fromEntries(
-        (live.elements || []).map((element) => [String(element.id), Number(element.stats?.total_points || 0)]),
+        (live.elements || []).map((element) => [String(element.id), soccerTimeScore(element.stats, element.explain)]),
       );
       const manager1 = scoreBySlot(state, scores, 1);
       const manager2 = scoreBySlot(state, scores, 2);
