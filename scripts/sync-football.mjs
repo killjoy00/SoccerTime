@@ -2,6 +2,38 @@ import fs from "node:fs/promises";
 
 const BASE = "https://fantasy.premierleague.com/api";
 
+function number(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function officialSavePoints(stats = {}, explain = []) {
+  if (explain.length) {
+    return explain.reduce((total, fixture) => total + (fixture.stats || [])
+      .filter((item) => item.identifier === "saves")
+      .reduce((sum, item) => sum + number(item.points), 0), 0);
+  }
+  return Math.floor(number(stats.saves) / 3);
+}
+
+function soccerTimeSavePoints(stats = {}, explain = []) {
+  if (explain.length) {
+    return explain.reduce((total, fixture) => total + (fixture.stats || [])
+      .filter((item) => item.identifier === "saves")
+      .reduce((sum, item) => sum + Math.floor(number(item.value) / 2), 0), 0);
+  }
+  return Math.floor(number(stats.saves) / 2);
+}
+
+function soccerTimeScore(stats = {}, explain = []) {
+  return number(stats.total_points)
+    - number(stats.bonus)
+    + (soccerTimeSavePoints(stats, explain) - officialSavePoints(stats, explain))
+    - (2 * number(stats.own_goals))
+    - number(stats.penalties_missed);
+}
+
+
 async function api(path) {
   const response = await fetch(`${BASE}${path}`, {
     headers: { "user-agent": "SoccerTime family fantasy app" },
@@ -44,7 +76,7 @@ const scores = {};
 for (const eventId of playableEvents) {
   const live = await api(`/event/${eventId}/live/`);
   scores[String(eventId)] = Object.fromEntries(
-    live.elements.map((element) => [String(element.id), Number(element.stats?.total_points || 0)]),
+    live.elements.map((element) => [String(element.id), soccerTimeScore(element.stats, element.explain)]),
   );
 }
 
@@ -67,6 +99,12 @@ const players = bootstrap.elements.map((player) => {
     recent,
     form: Number(player.form || 0),
     pointsPerGame: Number(player.points_per_game || 0),
+    minutes: Number(player.minutes || 0),
+    starts: Number(player.starts || 0),
+    goals: Number(player.goals_scored || 0),
+    assists: Number(player.assists || 0),
+    cleanSheets: Number(player.clean_sheets || 0),
+    saves: Number(player.saves || 0),
     status: player.status,
     news: player.news || "",
     chanceOfPlayingNextRound: player.chance_of_playing_next_round,
@@ -79,7 +117,7 @@ const fixtures = rawFixtures.map((fixture) => ({
   event: fixture.event,
   kickoff: fixture.kickoff_time,
   started: fixture.started,
-  finished: fixture.finished,
+  finished: Boolean(fixture.finished || fixture.finished_provisional),
   home: {
     id: fixture.team_h,
     name: teams.get(fixture.team_h)?.name || "",
