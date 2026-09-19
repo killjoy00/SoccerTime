@@ -134,11 +134,11 @@ export default function HistoryClient() {
   );
 
   if (loading) {
-    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" /></>;
+    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
   }
 
   if (error || !state?.ok) {
-    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">▥</div><b>History is not ready yet</b><span>{error || state?.error || "History unavailable."}</span></div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main><BottomNav active="history" /></>;
+    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">▥</div><b>History is not ready yet</b><span>{error || state?.error || "History unavailable."}</span></div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
   }
 
   const biggestMargin = stats.biggest ? Math.abs(number(stats.biggest.manager1_score) - number(stats.biggest.manager2_score)) : 0;
@@ -209,7 +209,7 @@ export default function HistoryClient() {
         </article>;
       }) : <section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">⚽</div><b>No completed Gameweeks yet</b><span>GW {activeGameweek || 4} will appear here automatically after official FPL data is checked and SoccerTime finalizes the result.</span></div></section>}
     </section>
-  </main><BottomNav active="history" /></>;
+  </main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
 }
 
 function HistoryHeader() {
