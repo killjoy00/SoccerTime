@@ -14,7 +14,11 @@ const GAMEWEEK_LOCKED_ACTIONS = new Set(["set_captain", "pickup_player"]);
 
 async function fplJson(path: string) {
   const response = await fetch(`${FPL}${path}`, {
-    headers: { "user-agent": "SoccerTime family fantasy app" },
+    headers: {
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+      "accept": "application/json,text/plain,*/*",
+      "accept-language": "en-US,en;q=0.9",
+    },
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
