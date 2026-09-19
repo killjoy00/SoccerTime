@@ -98,7 +98,9 @@ export async function GET() {
       liveScoring: !gameweekStarted || ((live.elements || []).length > 0 && scoresFinite),
       moveHistory: movesReadable,
     };
-    const ok = Object.values(checks).every(Boolean);
+    const criticalChecks = { ...checks, captainCountOk: true };
+    const ok = Object.values(criticalChecks).every(Boolean);
+    const warnings = captainCountOk ? [] : [`${managers.length - (state.captains || []).length} manager(s) have no Gameweek ${gameweek} captain`];
 
     return NextResponse.json({
       ok,
@@ -108,6 +110,7 @@ export async function GET() {
       managerCount: managers.length,
       pickCount: picks.length,
       transactionCount: movesReadable ? Number((movesResult.payload.moves || []).length) : null,
+      warnings,
     }, { status: ok ? 200 : 503 });
   } catch (error) {
     console.error("SoccerTime end-to-end health check failed", error);
