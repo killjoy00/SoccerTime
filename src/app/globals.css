@@ -651,3 +651,408 @@ h3{letter-spacing:-.18px}
 @media(prefers-reduced-motion:reduce){
   .nav,.nav:before,.nav:after,.navSelect,.navGlyph{transition:none}
 }
+
+
+/* 2026-10 FC-inspired screen color system */
+.shell[class*="theme-"]{
+  --screen-a:#1f8f50;
+  --screen-b:#a9f35d;
+  --screen-c:#0b3b24;
+  --accent:#8bea58;
+  --accent2:#27bf6b;
+  --accent-ink:#07130c;
+  --accent-soft:rgba(139,234,88,.14);
+  --accent-border:rgba(139,234,88,.26);
+  position:relative;
+  isolation:isolate;
+}
+.theme-match{
+  --screen-a:#11874a;
+  --screen-b:#baff63;
+  --screen-c:#07331e;
+  --accent:#b8ff67;
+  --accent2:#24c96f;
+  --accent-ink:#07120b;
+  --accent-soft:rgba(184,255,103,.16);
+  --accent-border:rgba(184,255,103,.30);
+}
+.theme-squad{
+  --screen-a:#0ba5a8;
+  --screen-b:#4ff1da;
+  --screen-c:#073a42;
+  --accent:#58ead9;
+  --accent2:#2ab4d0;
+  --accent-ink:#061517;
+  --accent-soft:rgba(79,241,218,.15);
+  --accent-border:rgba(79,241,218,.28);
+}
+.theme-draft{
+  --screen-a:#7f41d7;
+  --screen-b:#ea67ff;
+  --screen-c:#301563;
+  --accent:#d76cff;
+  --accent2:#7d55ff;
+  --accent-ink:#17091e;
+  --accent-soft:rgba(215,108,255,.15);
+  --accent-border:rgba(215,108,255,.29);
+}
+.theme-players{
+  --screen-a:#197cd3;
+  --screen-b:#48d9ff;
+  --screen-c:#0b315c;
+  --accent:#62c8ff;
+  --accent2:#28cdec;
+  --accent-ink:#061622;
+  --accent-soft:rgba(98,200,255,.16);
+  --accent-border:rgba(98,200,255,.29);
+}
+.theme-league{
+  --screen-a:#d48622;
+  --screen-b:#ffd763;
+  --screen-c:#5b3510;
+  --accent:#ffd86a;
+  --accent2:#ff9f43;
+  --accent-ink:#241603;
+  --accent-soft:rgba(255,216,106,.17);
+  --accent-border:rgba(255,216,106,.32);
+}
+.theme-history{
+  --screen-a:#5369df;
+  --screen-b:#a796ff;
+  --screen-c:#20295e;
+  --accent:#9daeff;
+  --accent2:#735fdf;
+  --accent-ink:#0d1024;
+  --accent-soft:rgba(157,174,255,.16);
+  --accent-border:rgba(157,174,255,.29);
+}
+.shell[class*="theme-"]::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 6% 4%,color-mix(in srgb,var(--screen-b) 30%,transparent),transparent 27rem),
+    radial-gradient(circle at 96% 18%,color-mix(in srgb,var(--screen-a) 34%,transparent),transparent 29rem),
+    radial-gradient(circle at 50% 110%,color-mix(in srgb,var(--screen-c) 22%,transparent),transparent 34rem),
+    linear-gradient(165deg,#eef3ef 0%,#f5f7f4 42%,#eef3f0 100%);
+}
+.shell[class*="theme-"]::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  opacity:.68;
+  background:
+    linear-gradient(118deg,transparent 0 32%,rgba(255,255,255,.42) 32.2% 32.5%,transparent 32.7% 100%),
+    linear-gradient(62deg,transparent 0 76%,color-mix(in srgb,var(--screen-b) 9%,transparent) 76.2% 76.6%,transparent 76.8%);
+  mask-image:linear-gradient(to bottom,#000 0 56%,transparent 92%);
+}
+.shell[class*="theme-"] .mast{
+  position:relative;
+}
+.shell[class*="theme-"] .brand span{
+  color:color-mix(in srgb,var(--accent2) 82%,#0d4d2a);
+}
+.shell[class*="theme-"] .brand:before{
+  background:linear-gradient(145deg,var(--accent),var(--accent2));
+  box-shadow:0 4px 14px color-mix(in srgb,var(--accent2) 36%,transparent);
+}
+.shell[class*="theme-"] .mast>.pill,
+.shell[class*="theme-"] .sectionHeading>.pill{
+  color:color-mix(in srgb,var(--accent2) 72%,#102018);
+  background:color-mix(in srgb,var(--accent) 16%,rgba(255,255,255,.92));
+  border-color:var(--accent-border);
+  box-shadow:0 5px 16px color-mix(in srgb,var(--accent2) 9%,transparent);
+}
+.shell[class*="theme-"]>.sectionHeading,
+.shell[class*="theme-"]>h2{
+  position:relative;
+}
+.shell[class*="theme-"]>.sectionHeading{
+  padding-left:14px;
+}
+.shell[class*="theme-"]>.sectionHeading:before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:5px;
+  bottom:5px;
+  width:4px;
+  border-radius:99px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2));
+  box-shadow:0 0 16px color-mix(in srgb,var(--accent) 40%,transparent);
+}
+.shell[class*="theme-"]>.sectionHeading h2{
+  letter-spacing:-.6px;
+}
+.shell[class*="theme-"]>.sectionHeading .eyebrow,
+.shell[class*="theme-"]>.eyebrow{
+  color:color-mix(in srgb,var(--accent2) 68%,#56645b);
+}
+.shell[class*="theme-"] .card{
+  position:relative;
+  border-color:color-mix(in srgb,var(--accent) 10%,rgba(16,32,24,.10));
+  box-shadow:
+    0 8px 24px rgba(16,32,24,.07),
+    0 1px 0 rgba(255,255,255,.82) inset;
+}
+.shell[class*="theme-"] .card:not(.hero):not(.resultCard):not(.historyHero):not(.captainCard){
+  background:
+    linear-gradient(145deg,rgba(255,254,250,.98),color-mix(in srgb,var(--accent) 4%,#fffefa));
+}
+.shell[class*="theme-"] .cardHeading{
+  border-bottom-color:color-mix(in srgb,var(--accent) 13%,rgba(16,32,24,.06));
+}
+.shell[class*="theme-"] .cardHeading:after{
+  content:"";
+  width:34px;
+  height:3px;
+  flex:0 0 auto;
+  border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  opacity:.75;
+}
+.shell[class*="theme-"] .stat{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 100% 0,color-mix(in srgb,var(--accent) 18%,transparent),transparent 70%),
+    linear-gradient(145deg,#fffefa,color-mix(in srgb,var(--accent) 9%,#f8faf7));
+  border-color:var(--accent-border);
+}
+.shell[class*="theme-"] .stat:after{
+  content:"";
+  position:absolute;
+  right:-18px;
+  bottom:-24px;
+  width:68px;
+  height:68px;
+  border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);
+  box-shadow:0 0 0 13px color-mix(in srgb,var(--accent) 5%,transparent);
+}
+.shell[class*="theme-"] .stat b{
+  color:color-mix(in srgb,var(--accent2) 72%,#102018);
+}
+.shell[class*="theme-"] .tiny{
+  color:color-mix(in srgb,var(--accent2) 45%,var(--muted));
+}
+.shell[class*="theme-"] .playerRow{
+  position:relative;
+}
+.shell[class*="theme-"] .playerRow:hover{
+  background:color-mix(in srgb,var(--accent) 5%,rgba(255,255,255,.5));
+}
+.shell[class*="theme-"] .playerAvatar{
+  border-color:color-mix(in srgb,var(--accent) 18%,rgba(16,32,24,.10));
+}
+.shell[class*="theme-"] .livePoints{
+  background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 20%,#f4f7f3),color-mix(in srgb,var(--accent2) 11%,#eef3ef));
+  border-color:var(--accent-border);
+  box-shadow:0 4px 11px color-mix(in srgb,var(--accent2) 8%,transparent);
+}
+.shell[class*="theme-"] .livePoints b{
+  color:color-mix(in srgb,var(--accent2) 76%,#102018);
+}
+.shell[class*="theme-"] .playerMetrics>div,
+.shell[class*="theme-"] .tablePts{
+  background:color-mix(in srgb,var(--accent) 7%,#f2f5f1);
+  border-color:color-mix(in srgb,var(--accent) 13%,rgba(16,32,24,.055));
+}
+.shell[class*="theme-"] .pos{
+  background:color-mix(in srgb,var(--accent) 9%,#edf1ed);
+  border-color:color-mix(in srgb,var(--accent) 13%,rgba(16,32,24,.055));
+}
+.shell[class*="theme-"] .btn:not(.secondary){
+  color:var(--accent-ink);
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:1px solid color-mix(in srgb,var(--accent) 64%,white);
+  box-shadow:
+    0 7px 17px color-mix(in srgb,var(--accent2) 21%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.34);
+}
+.shell[class*="theme-"] .btn:not(.secondary):hover:not(:disabled){
+  box-shadow:
+    0 10px 24px color-mix(in srgb,var(--accent2) 27%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.42);
+}
+.shell[class*="theme-"] .btn.secondary{
+  border-color:color-mix(in srgb,var(--accent) 13%,rgba(16,32,24,.07));
+  background:color-mix(in srgb,var(--accent) 7%,#f0f3ef);
+}
+.shell[class*="theme-"] .filters input:focus,
+.shell[class*="theme-"] .filters select:focus,
+.shell[class*="theme-"] .setup input:focus,
+.shell[class*="theme-"] .setup select:focus{
+  border-color:color-mix(in srgb,var(--accent2) 55%,#ccd4ce);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 13%,transparent);
+}
+.shell[class*="theme-"] .emptyIcon{
+  color:color-mix(in srgb,var(--accent2) 75%,#17683d);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 10%,#edf3ee),color-mix(in srgb,var(--accent2) 7%,#e6ede7));
+}
+.shell[class*="theme-"] .transactionIcon,
+.shell[class*="theme-"] .rank,
+.shell[class*="theme-"] .gameweekBadge{
+  background:color-mix(in srgb,var(--accent) 8%,#f0f1ed);
+  border-color:color-mix(in srgb,var(--accent) 13%,rgba(16,32,24,.055));
+}
+.shell[class*="theme-"] .rank.leader,
+.shell[class*="theme-"] .trophyBadge{
+  color:var(--accent-ink);
+  background:linear-gradient(145deg,var(--accent),var(--accent2));
+  border-color:var(--accent-border);
+}
+.theme-match .hero{
+  border:1px solid rgba(209,255,167,.16);
+  background:
+    linear-gradient(118deg,rgba(255,255,255,.08),transparent 26%),
+    radial-gradient(circle at 88% 8%,rgba(184,255,103,.25),transparent 24%),
+    linear-gradient(145deg,#0a2c1a 0%,#0c4d2a 50%,#168b4b 100%);
+  box-shadow:
+    0 22px 52px rgba(4,53,27,.22),
+    inset 0 1px 0 rgba(255,255,255,.13);
+}
+.theme-match .hero:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(115deg,transparent 0 64%,rgba(184,255,103,.10) 64.2% 64.8%,transparent 65%),
+    linear-gradient(115deg,transparent 0 72%,rgba(255,255,255,.06) 72.2% 72.5%,transparent 72.7%);
+}
+.theme-match .score{
+  color:#f5fff7;
+  text-shadow:0 0 24px rgba(184,255,103,.18),0 3px 18px rgba(0,0,0,.22);
+}
+.theme-match .liveOutcome.ahead{
+  background:rgba(184,255,103,.17);
+  color:#d8ffb0;
+  border-color:rgba(184,255,103,.22);
+}
+.theme-match .fixtureState.live{
+  background:linear-gradient(145deg,#ffefec,#ffd9d2);
+  box-shadow:0 0 0 3px rgba(167,68,58,.06);
+}
+.theme-squad .captainCard{
+  overflow:hidden;
+  border-color:rgba(79,241,218,.30);
+  background:
+    radial-gradient(circle at 88% 4%,rgba(79,241,218,.19),transparent 35%),
+    linear-gradient(135deg,#fffefa,#ebfbfa 64%,#e1f8fb);
+  box-shadow:0 12px 32px rgba(11,165,168,.10);
+}
+.theme-squad .captainCard:after{
+  content:"C";
+  position:absolute;
+  right:12px;
+  bottom:-21px;
+  font-size:88px;
+  line-height:1;
+  font-weight:950;
+  color:rgba(11,165,168,.055);
+  pointer-events:none;
+}
+.theme-squad .captainTag{
+  color:#051716;
+  background:linear-gradient(135deg,#69f4df,#30bccc);
+}
+.theme-draft .draftbar{
+  border-color:rgba(215,108,255,.31);
+  background:
+    radial-gradient(circle at 92% 0,rgba(215,108,255,.15),transparent 44%),
+    rgba(255,253,255,.94);
+  box-shadow:0 13px 35px rgba(87,38,133,.12);
+}
+.theme-draft .draftbar.yourTurn{
+  border-color:rgba(215,108,255,.55);
+  box-shadow:0 15px 40px rgba(125,85,255,.15),0 0 0 1px rgba(215,108,255,.08);
+}
+.theme-draft .turnPill{
+  color:#1b0924;
+  background:linear-gradient(135deg,#e586ff,#9e72ff);
+}
+.theme-draft .draftTurnNote.mine{
+  color:#592081;
+  background:linear-gradient(90deg,rgba(215,108,255,.13),rgba(125,85,255,.09));
+  border-color:rgba(215,108,255,.19);
+}
+.theme-draft .playerList{
+  border-color:rgba(215,108,255,.17);
+}
+.theme-players .playerList{
+  border-color:rgba(98,200,255,.20);
+  box-shadow:0 10px 30px rgba(25,124,211,.08);
+}
+.theme-players .statusTag{
+  box-shadow:0 3px 10px rgba(167,68,58,.05);
+}
+.theme-league .standings{
+  overflow:hidden;
+  border-color:rgba(255,216,106,.30);
+  background:
+    radial-gradient(circle at 100% 0,rgba(255,216,106,.17),transparent 42%),
+    linear-gradient(145deg,#fffefa,#fff9e9);
+}
+.theme-league .standings:before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  height:3px;
+  background:linear-gradient(90deg,#ff9f43,#ffd86a,#fff0aa,#ffd86a,#ff9f43);
+}
+.theme-league .tablePts{
+  background:linear-gradient(145deg,#fff2bd,#ffe49a);
+  border-color:rgba(212,134,34,.17);
+}
+.theme-league .tablePts b{
+  color:#8c5610;
+}
+.theme-history .historyHero{
+  overflow:hidden;
+  color:#fff;
+  border-color:rgba(185,192,255,.22);
+  background:
+    radial-gradient(circle at 12% 0,rgba(167,150,255,.30),transparent 35%),
+    radial-gradient(circle at 92% 20%,rgba(91,116,224,.30),transparent 34%),
+    linear-gradient(145deg,#242d6e,#384aa2 58%,#624fae);
+  box-shadow:0 18px 44px rgba(32,41,94,.18);
+}
+.theme-history .historyHero .eyebrow,
+.theme-history .historyHero .sub,
+.theme-history .historyHero .historySeries span{
+  color:#dce2ff;
+}
+.theme-history .historyHero .historySeries b{
+  color:#fff;
+  text-shadow:0 0 20px rgba(167,150,255,.22);
+}
+.theme-history .historyHero .historySeriesMid strong{
+  color:#d9e0ff;
+}
+.theme-history .historyGame{
+  border-color:rgba(157,174,255,.16);
+  background:
+    radial-gradient(circle at 100% 0,rgba(157,174,255,.10),transparent 45%),
+    linear-gradient(145deg,#fffefa,#f4f5ff);
+}
+.theme-history .historyRoundTrophy{
+  filter:drop-shadow(0 4px 7px rgba(115,95,223,.16));
+}
+@media(max-width:430px){
+  .shell[class*="theme-"]::before{
+    background:
+      radial-gradient(circle at 0 -2%,color-mix(in srgb,var(--screen-b) 27%,transparent),transparent 20rem),
+      radial-gradient(circle at 108% 18%,color-mix(in srgb,var(--screen-a) 29%,transparent),transparent 21rem),
+      linear-gradient(165deg,#eef3ef 0%,#f6f7f5 50%,#eef3f0 100%);
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .shell[class*="theme-"] .card,
+  .shell[class*="theme-"] .livePoints{transition:none}
+}
