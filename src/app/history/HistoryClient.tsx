@@ -134,11 +134,11 @@ export default function HistoryClient() {
   );
 
   if (loading) {
-    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
+    return <><main className="shell historyShell theme-history"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
   }
 
   if (error || !state?.ok) {
-    return <><main className="shell historyShell"><HistoryHeader /><section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">▥</div><b>History is not ready yet</b><span>{error || state?.error || "History unavailable."}</span></div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
+    return <><main className="shell historyShell theme-history"><HistoryHeader /><section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">▥</div><b>History is not ready yet</b><span>{error || state?.error || "History unavailable."}</span></div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
   }
 
   const biggestMargin = stats.biggest ? Math.abs(number(stats.biggest.manager1_score) - number(stats.biggest.manager2_score)) : 0;
@@ -152,7 +152,7 @@ export default function HistoryClient() {
         : club(manager2, "Manager 2")
     : "—";
 
-  return <><main className="shell historyShell">
+  return <><main className="shell historyShell theme-history">
     <HistoryHeader />
 
     <section className="card historyHero">
