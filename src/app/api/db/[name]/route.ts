@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
 import { progressSoccerTimeGameweeks } from "@/lib/gameweek-progress";
+import { normalizeLeagueCode } from "@/lib/league-code";
 
 const FPL = "https://fantasy.premierleague.com/api";
 const RPC_NAMES: Record<string, string> = {
@@ -74,6 +75,10 @@ export async function POST(
   let body: Record<string, unknown>;
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
+
+  if (typeof body.p_code === "string") {
+    body = { ...body, p_code: normalizeLeagueCode(body.p_code) };
+  }
 
   if (name === "league_state") {
     const progress = await progressSoccerTimeGameweeks("app");
