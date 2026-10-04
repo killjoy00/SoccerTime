@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { normalizeLeagueCode } from "@/lib/league-code";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Move history is production-only" }, { status: 403 });
   }
 
-  const code = request.nextUrl.searchParams.get("code")?.trim();
-  if (!code) return NextResponse.json({ error: "League code required" }, { status: 400 });
+  const rawCode = request.nextUrl.searchParams.get("code")?.trim();
+  if (!rawCode) return NextResponse.json({ error: "League code required" }, { status: 400 });
+  const code = normalizeLeagueCode(rawCode);
 
   const oidcToken = await getSoccerTimeOidcToken();
   if (!oidcToken) return NextResponse.json({ error: "Missing workload identity" }, { status: 503 });
