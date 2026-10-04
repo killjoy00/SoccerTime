@@ -13,7 +13,7 @@ type Player = {
   teamId?: number;
   position: string;
   total: number;
-  recent?: number[];
+  recent: number[];
   form?: number;
   pointsPerGame?: number;
   minutes?: number;
