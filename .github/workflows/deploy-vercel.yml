@@ -43,16 +43,6 @@ jobs:
       - name: Pull production project settings
         run: npx --yes vercel@${VERCEL_CLI_VERSION} pull --yes --environment=production --token="$VERCEL_TOKEN" --scope=killjoy00s-projects
 
-      - name: Apply one-time league code migration
-        shell: bash
-        run: |
-          set -a
-          if [ -f .vercel/.env.production.local ]; then
-            . .vercel/.env.production.local
-          fi
-          set +a
-          node scripts/20261004-change-league-code.mjs
-
       - name: Ensure production custom domain
         run: |
           if ! npx --yes vercel@${VERCEL_CLI_VERSION} domains inspect soccertime.planitnow.us --project soccer-time --token="$VERCEL_TOKEN" --scope=killjoy00s-projects >/dev/null 2>&1; then
@@ -64,6 +54,33 @@ jobs:
 
       - name: Deploy prebuilt artifact
         run: npx --yes vercel@${VERCEL_CLI_VERSION} deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN" --scope=killjoy00s-projects
+
+      - name: Change family league code to mindell
+        shell: bash
+        run: |
+          set -a
+          if [ -f .vercel/.env.production.local ]; then
+            . .vercel/.env.production.local
+          fi
+          set +a
+          if [ -z "$SOCCERTIME_MIGRATION_TOKEN" ]; then
+            echo "::error::SOCCERTIME_MIGRATION_TOKEN is missing."
+            exit 1
+          fi
+          for attempt in 1 2 3 4 5 6; do
+            echo "League code migration attempt ${attempt}/6"
+            if response="$(curl --fail-with-body --silent --show-error -X POST -H "Authorization: Bearer $SOCCERTIME_MIGRATION_TOKEN" https://soccertime.planitnow.us/api/admin/change-league-code 2>&1)"; then
+              echo "$response"
+              if printf '%s' "$response" | node -e 'let s=""; process.stdin.on("data", d => s += d).on("end", () => { try { process.exit(JSON.parse(s).ok === true ? 0 : 1); } catch { process.exit(1); } });'; then
+                exit 0
+              fi
+            else
+              echo "$response"
+            fi
+            sleep 5
+          done
+          echo "::error::League code migration failed."
+          exit 1
 
       - name: Progress completed Gameweeks
         run: |
