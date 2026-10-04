@@ -6,8 +6,8 @@ export type MainTab = "match" | "squad" | "draft" | "players" | "league";
 type NavId = MainTab | "history";
 
 const items: Array<{ id: MainTab; label: string }> = [
-  { id: "match", label: "Match" },
-  { id: "squad", label: "Squad" },
+  { id: "match", label: "Matchup" },
+  { id: "squad", label: "Team" },
   { id: "draft", label: "Draft" },
   { id: "players", label: "Players" },
   { id: "league", label: "League" },
