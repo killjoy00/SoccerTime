@@ -210,9 +210,11 @@ export function FantasyMatchupCenter({
       {weeks.map((matchup) => {
         const week = Number(matchup.gameweek);
         const isCurrent = week === gw;
-        const mineScore = Number(me?.slot === 1 ? matchup.manager1_score : matchup.manager2_score);
-        const theirScore = Number(me?.slot === 1 ? matchup.manager2_score : matchup.manager1_score);
-        const hasScore = Number.isFinite(mineScore) && Number.isFinite(theirScore);
+        const myRaw = me?.slot === 1 ? matchup.manager1_score : matchup.manager2_score;
+        const theirRaw = me?.slot === 1 ? matchup.manager2_score : matchup.manager1_score;
+        const mineScore = Number(myRaw);
+        const theirScore = Number(theirRaw);
+        const hasScore = myRaw != null && theirRaw != null && Number.isFinite(mineScore) && Number.isFinite(theirScore);
         const result = matchup.status === "final" && hasScore ? (mineScore === theirScore ? "D" : mineScore > theirScore ? "W" : "L") : null;
         return <div className={`fantasyWeekPill ${isCurrent ? "current" : ""}`} key={week}>
           <span>GW {week}</span>
@@ -502,7 +504,7 @@ export function FantasyLeagueCenter({
           const m2 = managers.find((manager) => Number(manager.slot) === 2);
           const s1 = Number(matchup.manager1_score);
           const s2 = Number(matchup.manager2_score);
-          const hasScores = Number.isFinite(s1) && Number.isFinite(s2);
+          const hasScores = matchup.manager1_score != null && matchup.manager2_score != null && Number.isFinite(s1) && Number.isFinite(s2);
           return <div className={`fantasyScheduleRow ${Number(matchup.gameweek) === gw ? "current" : ""}`} key={matchup.gameweek}>
             <div className="fantasyGameweekBadge">GW <b>{matchup.gameweek}</b></div>
             <div className="fantasyScheduleTeams">
