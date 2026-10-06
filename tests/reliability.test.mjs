@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createFplFetcher, FplUpstreamError } from "../src/lib/fpl-server.ts";
 import { createSoccerTimeRpc } from "../src/lib/neon-server.ts";
+import { createFplApi } from "../scripts/fpl-http.mjs";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -176,4 +177,41 @@ test("Neon application errors are returned without pointless auth retries", asyn
   assert.equal(result.attempts, 1);
   assert.equal(tokenCalls, 1);
   assert.equal(rpcCalls, 1);
+});
+
+
+test("static FPL sync retries transient 403s instead of failing a deploy", async () => {
+  const responses = [
+    jsonResponse({ error: "blocked" }, 403),
+    jsonResponse({ events: [{ id: 6 }] }, 200),
+  ];
+  let calls = 0;
+  const api = createFplApi({
+    delaysMs: [0, 0, 0],
+    sleep: async () => {},
+    fetcher: async () => {
+      calls += 1;
+      return responses.shift();
+    },
+  });
+
+  const result = await api("/bootstrap-static/");
+
+  assert.equal(calls, 2);
+  assert.deepEqual(result, { events: [{ id: 6 }] });
+});
+
+test("static FPL sync does not waste retries on a real 404", async () => {
+  let calls = 0;
+  const api = createFplApi({
+    delaysMs: [0, 0, 0],
+    sleep: async () => {},
+    fetcher: async () => {
+      calls += 1;
+      return jsonResponse({ error: "missing" }, 404);
+    },
+  });
+
+  await assert.rejects(() => api("/missing/"), /404/);
+  assert.equal(calls, 1);
 });
