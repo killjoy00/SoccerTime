@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeRpc } from "@/lib/neon-server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,11 +10,8 @@ export async function GET() {
     return NextResponse.json({ ok: false, stage: "environment" }, { status: 403 });
   }
 
-  const oidcToken = await getSoccerTimeOidcToken();
-  if (!oidcToken) return NextResponse.json({ ok: false, stage: "identity" }, { status: 503 });
-
   try {
-    const result = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
+    const result = await soccerTimeRpc("league_state_by_id", { p_league_id: LEAGUE_ID }, { source: "health:db" });
     if (!result.ok || !result.payload?.ok) {
       console.error("SoccerTime DB health RPC failed", {
         status: result.status,
