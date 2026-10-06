@@ -49,73 +49,90 @@ export async function neonRpc(oidcToken: string, name: string, body: Record<stri
   };
 }
 
-function authRejected(result: Awaited<ReturnType<typeof neonRpc>>) {
+type NeonRpcResult = Awaited<ReturnType<typeof neonRpc>>;
+type SoccerTimeRpcDependencies = {
+  getToken?: () => Promise<string | null>;
+  rpc?: (oidcToken: string, name: string, body: Record<string, unknown>) => Promise<NeonRpcResult>;
+  sleep?: (ms: number) => Promise<void>;
+  delaysMs?: number[];
+};
+
+function authRejected(result: NeonRpcResult) {
   return result.status === 401 ||
     result.status === 403 ||
     String(result.payload?.error || "").toLowerCase() === "unauthorized";
 }
 
-async function sleep(ms: number) {
+async function defaultSleep(ms: number) {
   if (ms > 0) await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function soccerTimeRpc(
-  name: string,
-  body: Record<string, unknown>,
-  options: { attempts?: number; source?: string } = {},
-) {
-  const attempts = Math.max(1, Math.min(options.attempts ?? AUTH_RETRY_DELAYS_MS.length, AUTH_RETRY_DELAYS_MS.length));
-  let lastResult: Awaited<ReturnType<typeof neonRpc>> | null = null;
+export function createSoccerTimeRpc(dependencies: SoccerTimeRpcDependencies = {}) {
+  const getToken = dependencies.getToken ?? getSoccerTimeOidcToken;
+  const rpc = dependencies.rpc ?? neonRpc;
+  const sleep = dependencies.sleep ?? defaultSleep;
+  const delaysMs = dependencies.delaysMs?.length ? dependencies.delaysMs : AUTH_RETRY_DELAYS_MS;
 
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await sleep(AUTH_RETRY_DELAYS_MS[attempt] ?? AUTH_RETRY_DELAYS_MS[AUTH_RETRY_DELAYS_MS.length - 1]);
+  return async function soccerTimeRpc(
+    name: string,
+    body: Record<string, unknown>,
+    options: { attempts?: number; source?: string } = {},
+  ) {
+    const attempts = Math.max(1, Math.min(options.attempts ?? delaysMs.length, delaysMs.length));
+    let lastResult: NeonRpcResult | null = null;
 
-    const oidcToken = await getSoccerTimeOidcToken();
-    if (!oidcToken) {
-      console.warn("SoccerTime workload identity retry", {
-        dependency: "neon",
-        source: options.source || "app",
-        rpc: name,
-        attempt: attempt + 1,
-        reason: "token-unavailable",
-      });
-      continue;
-    }
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      await sleep(delaysMs[attempt] ?? delaysMs[delaysMs.length - 1] ?? 0);
 
-    try {
-      const result = await neonRpc(oidcToken, name, body);
-      lastResult = result;
-
-      if (!authRejected(result)) {
-        return { ...result, attempts: attempt + 1 };
+      const oidcToken = await getToken();
+      if (!oidcToken) {
+        console.warn("SoccerTime workload identity retry", {
+          dependency: "neon",
+          source: options.source || "app",
+          rpc: name,
+          attempt: attempt + 1,
+          reason: "token-unavailable",
+        });
+        continue;
       }
 
-      console.warn("SoccerTime workload auth retry", {
-        dependency: "neon",
-        source: options.source || "app",
-        rpc: name,
-        attempt: attempt + 1,
-        status: result.status,
-        error: result.payload?.error || "Unauthorized",
-      });
-    } catch (error) {
-      console.warn("SoccerTime workload network retry", {
-        dependency: "neon",
-        source: options.source || "app",
-        rpc: name,
-        attempt: attempt + 1,
-        error,
-      });
-    }
-  }
+      try {
+        const result = await rpc(oidcToken, name, body);
+        lastResult = result;
 
-  if (lastResult) return { ...lastResult, attempts };
-  return {
-    ok: false,
-    status: 503,
-    text: JSON.stringify({ ok: false, error: "Missing workload identity" }),
-    payload: { ok: false, error: "Missing workload identity" },
-    contentType: "application/json",
-    attempts,
+        if (!authRejected(result)) {
+          return { ...result, attempts: attempt + 1 };
+        }
+
+        console.warn("SoccerTime workload auth retry", {
+          dependency: "neon",
+          source: options.source || "app",
+          rpc: name,
+          attempt: attempt + 1,
+          status: result.status,
+          error: result.payload?.error || "Unauthorized",
+        });
+      } catch (error) {
+        console.warn("SoccerTime workload network retry", {
+          dependency: "neon",
+          source: options.source || "app",
+          rpc: name,
+          attempt: attempt + 1,
+          error,
+        });
+      }
+    }
+
+    if (lastResult) return { ...lastResult, attempts };
+    return {
+      ok: false,
+      status: 503,
+      text: JSON.stringify({ ok: false, error: "Missing workload identity" }),
+      payload: { ok: false, error: "Missing workload identity" },
+      contentType: "application/json",
+      attempts,
+    };
   };
 }
+
+export const soccerTimeRpc = createSoccerTimeRpc();
