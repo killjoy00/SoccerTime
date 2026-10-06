@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import BottomNav from "../BottomNav";
+import PlayerFace from "../PlayerFace";
 import { rpc } from "@/lib/neon";
 
 type Manager = {
@@ -50,6 +51,24 @@ type TeamGame = {
   score: number;
 };
 
+type StaticPlayer = {
+  id: number;
+  code?: number;
+  name: string;
+  team: string;
+  position: string;
+};
+
+type StaticData = {
+  players?: StaticPlayer[];
+  scores?: Record<string, Record<string, number>>;
+};
+
+type Streak = {
+  kind: "W" | "D" | "L" | "—";
+  count: number;
+};
+
 function number(value: number | string | null | undefined) {
   return Number(value || 0);
 }
@@ -58,8 +77,54 @@ function club(manager: Manager | undefined, fallback: string) {
   return manager?.club_name || fallback;
 }
 
+function resultForSlot(game: Matchup, slot: 1 | 2): "W" | "D" | "L" {
+  const mine = number(slot === 1 ? game.manager1_score : game.manager2_score);
+  const theirs = number(slot === 1 ? game.manager2_score : game.manager1_score);
+  return mine === theirs ? "D" : mine > theirs ? "W" : "L";
+}
+
+function currentStreak(games: Matchup[], slot: 1 | 2): Streak {
+  if (!games.length) return { kind: "—", count: 0 };
+  const sorted = [...games].sort((a, b) => Number(b.gameweek) - Number(a.gameweek));
+  const kind = resultForSlot(sorted[0], slot);
+  let count = 0;
+  for (const game of sorted) {
+    if (resultForSlot(game, slot) !== kind) break;
+    count += 1;
+  }
+  return { kind, count };
+}
+
+function longestWinStreak(games: Matchup[], slot: 1 | 2) {
+  let longest = 0;
+  let current = 0;
+  for (const game of [...games].sort((a, b) => Number(a.gameweek) - Number(b.gameweek))) {
+    if (resultForSlot(game, slot) === "W") {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+  return longest;
+}
+
+function streakLabel(streak: Streak) {
+  if (!streak.count || streak.kind === "—") return "No streak yet";
+  const word = streak.kind === "W" ? "win" : streak.kind === "L" ? "loss" : "draw";
+  return streak.count + " " + word + (streak.count === 1 ? "" : "s") + " straight";
+}
+
+function winnerForGame(game: Matchup, manager1?: Manager, manager2?: Manager) {
+  const score1 = number(game.manager1_score);
+  const score2 = number(game.manager2_score);
+  if (score1 === score2) return "Draw";
+  return score1 > score2 ? club(manager1, "Manager 1") : club(manager2, "Manager 2");
+}
+
 export default function HistoryClient() {
   const [state, setState] = useState<LeagueState | null>(null);
+  const [staticData, setStaticData] = useState<StaticData>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -75,10 +140,17 @@ export default function HistoryClient() {
         return;
       }
       try {
-        const result = await rpc("league_state", { p_code: code });
+        const [result, feed] = await Promise.all([
+          rpc("league_state", { p_code: code }),
+          fetch("/data/epl.json", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).catch(() => null),
+        ]);
         if (!active) return;
         if (!result?.ok) setError(result?.error || "Could not load league history.");
-        else setState(result);
+        else {
+          setState(result);
+          setError("");
+        }
+        if (feed) setStaticData(feed);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Could not load league history.");
       } finally {
@@ -96,6 +168,8 @@ export default function HistoryClient() {
   const manager1 = state?.managers?.find((manager) => Number(manager.slot) === 1);
   const manager2 = state?.managers?.find((manager) => Number(manager.slot) === 2);
   const activeGameweek = number(state?.league?.active_gameweek);
+  const roundNo = number(state?.draft?.round_no);
+  const roundStart = number(state?.draft?.start_gameweek);
   const roundEnd = number(state?.draft?.end_gameweek);
 
   const completed = useMemo(
@@ -116,6 +190,9 @@ export default function HistoryClient() {
     const highest = teamGames.length
       ? [...teamGames].sort((a, b) => b.score - a.score || b.gameweek - a.gameweek)[0]
       : null;
+    const lowest = teamGames.length
+      ? [...teamGames].sort((a, b) => a.score - b.score || b.gameweek - a.gameweek)[0]
+      : null;
     const biggest = completed.length
       ? [...completed].sort((a, b) => Math.abs(number(b.manager1_score) - number(b.manager2_score)) - Math.abs(number(a.manager1_score) - number(a.manager2_score)))[0]
       : null;
@@ -125,13 +202,99 @@ export default function HistoryClient() {
     const combined = completed.length
       ? [...completed].sort((a, b) => (number(b.manager1_score) + number(b.manager2_score)) - (number(a.manager1_score) + number(a.manager2_score)))[0]
       : null;
-    return { m1Wins, m2Wins, draws, highest, biggest, closest, combined };
+    return {
+      m1Wins,
+      m2Wins,
+      draws,
+      highest,
+      lowest,
+      biggest,
+      closest,
+      combined,
+      m1Current: currentStreak(completed, 1),
+      m2Current: currentStreak(completed, 2),
+      m1LongestWins: longestWinStreak(completed, 1),
+      m2LongestWins: longestWinStreak(completed, 2),
+    };
   }, [completed]);
 
   const roundResults = useMemo(
     () => [...(state?.round_results || [])].sort((a, b) => Number(b.round_no) - Number(a.round_no)),
     [state?.round_results],
   );
+
+  const currentRound = useMemo(() => {
+    const games = completed.filter((game) => Number(game.gameweek) >= roundStart && Number(game.gameweek) <= roundEnd);
+    const m1Wins = games.filter((game) => number(game.manager1_score) > number(game.manager2_score)).length;
+    const m2Wins = games.filter((game) => number(game.manager2_score) > number(game.manager1_score)).length;
+    const m1Points = games.reduce((sum, game) => sum + number(game.manager1_score), 0);
+    const m2Points = games.reduce((sum, game) => sum + number(game.manager2_score), 0);
+    const leader = m1Wins === m2Wins
+      ? (m1Points === m2Points ? null : m1Points > m2Points ? manager1 : manager2)
+      : m1Wins > m2Wins ? manager1 : manager2;
+    return { games, m1Wins, m2Wins, m1Points, m2Points, leader };
+  }, [completed, manager1, manager2, roundEnd, roundStart]);
+
+  const playerOfWeek = useMemo(() => {
+    const latest = completed[0];
+    if (!latest) return null;
+    const scores = staticData.scores?.[String(latest.gameweek)];
+    if (!scores) return null;
+    const entries = Object.entries(scores)
+      .map(([id, score]) => ({ id: Number(id), score: Number(score) }))
+      .filter((entry) => Number.isFinite(entry.id) && Number.isFinite(entry.score))
+      .sort((a, b) => b.score - a.score || a.id - b.id);
+    const leader = entries[0];
+    if (!leader) return null;
+    const player = staticData.players?.find((item) => Number(item.id) === leader.id);
+    if (!player) return null;
+    const tied = entries.filter((entry) => entry.score === leader.score).length;
+    return { ...player, score: leader.score, gameweek: Number(latest.gameweek), tied };
+  }, [completed, staticData.players, staticData.scores]);
+
+  const milestones = useMemo(() => {
+    const latest = completed[0];
+    if (!latest) return [] as Array<{ kicker: string; title: string; detail: string }>;
+    const score1 = number(latest.manager1_score);
+    const score2 = number(latest.manager2_score);
+    const margin = Math.abs(score1 - score2);
+    const highScore = Math.max(score1, score2);
+    const cards: Array<{ kicker: string; title: string; detail: string }> = [];
+
+    if (stats.highest && Number(stats.highest.gameweek) === Number(latest.gameweek) && stats.highest.score === highScore) {
+      cards.push({
+        kicker: "NEW RECORD",
+        title: "Season-high score",
+        detail: String(stats.highest.score) + " points by " + (stats.highest.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2")),
+      });
+    }
+    if (stats.biggest && Number(stats.biggest.gameweek) === Number(latest.gameweek) && margin > 0) {
+      cards.push({
+        kicker: "RIVALRY MARK",
+        title: "Biggest win so far",
+        detail: String(margin) + "-point margin · " + winnerForGame(latest, manager1, manager2),
+      });
+    } else if (stats.closest && Number(stats.closest.gameweek) === Number(latest.gameweek)) {
+      cards.push({
+        kicker: "PHOTO FINISH",
+        title: "Closest derby so far",
+        detail: String(margin) + "-point margin in GW " + String(latest.gameweek),
+      });
+    }
+
+    const winnerSlot: 1 | 2 | null = score1 === score2 ? null : score1 > score2 ? 1 : 2;
+    const current = winnerSlot === 1 ? stats.m1Current : winnerSlot === 2 ? stats.m2Current : null;
+    const winner = winnerSlot === 1 ? manager1 : winnerSlot === 2 ? manager2 : undefined;
+    if (current?.kind === "W" && current.count >= 2) {
+      cards.push({
+        kicker: "HEAT CHECK",
+        title: String(current.count) + " straight for " + club(winner, "Leader"),
+        detail: "Longest win streak: " + String(winnerSlot === 1 ? stats.m1LongestWins : stats.m2LongestWins),
+      });
+    }
+
+    return cards.slice(0, 3);
+  }, [completed, manager1, manager2, stats]);
 
   if (loading) {
     return <><main className="shell historyShell theme-history"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
@@ -151,19 +314,60 @@ export default function HistoryClient() {
         ? club(manager1, "Manager 1")
         : club(manager2, "Manager 2")
     : "—";
+  const lowestClub = stats.lowest?.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2");
+  const seriesLeader = stats.m1Wins === stats.m2Wins ? null : stats.m1Wins > stats.m2Wins ? manager1 : manager2;
+  const seasonLeader = number(manager1?.table_points) === number(manager2?.table_points)
+    ? (number(manager1?.fantasy_points) === number(manager2?.fantasy_points) ? null : number(manager1?.fantasy_points) > number(manager2?.fantasy_points) ? manager1 : manager2)
+    : number(manager1?.table_points) > number(manager2?.table_points) ? manager1 : manager2;
+  const seasonFinished = completed.some((game) => Number(game.gameweek) === 38);
+  const leagueStart = completed.length
+    ? Math.min(...completed.map((game) => Number(game.gameweek)))
+    : (roundStart || activeGameweek || 1);
 
   return <><main className="shell historyShell theme-history">
     <HistoryHeader />
 
     <section className="card historyHero">
-      <div className="eyebrow">All-time house derby</div>
+      <div className="eyebrow">Season house derby</div>
       <div className="historySeries">
         <div><span>{club(manager1, "Manager 1")}</span><b>{stats.m1Wins}</b></div>
         <div className="historySeriesMid"><strong>{stats.draws}</strong><span>draws</span></div>
         <div><span>{club(manager2, "Manager 2")}</span><b>{stats.m2Wins}</b></div>
       </div>
-      <p className="sub">{completed.length ? `${completed.length} completed Gameweek${completed.length === 1 ? "" : "s"}` : `History starts when Gameweek ${activeGameweek || 4} finalizes.`}</p>
+      <p className="sub">{completed.length ? `${completed.length} completed Gameweek${completed.length === 1 ? "" : "s"} · ${seriesLeader ? `${club(seriesLeader, "Leader")} leads the series` : "series level"}` : `History starts when Gameweek ${activeGameweek || 4} finalizes.`}</p>
     </section>
+
+    <section className="card rivalryPulse">
+      <div className="historyGameTop">
+        <div><div className="eyebrow">{seasonFinished ? "Season champion" : "Rivalry pulse"}</div><h2>{seasonLeader ? club(seasonLeader, "Leader") : "Dead level"}</h2></div>
+        <span className="pill">{seasonFinished ? "CHAMPION" : "ROUND " + String(roundNo || 1)}</span>
+      </div>
+      <div className="rivalryPulseGrid">
+        <div><span>CURRENT STREAK</span><b>{stats.m1Current.count >= stats.m2Current.count ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</b><small>{stats.m1Current.count >= stats.m2Current.count ? streakLabel(stats.m1Current) : streakLabel(stats.m2Current)}</small></div>
+        <div><span>LONGEST WIN STREAK</span><b>{Math.max(stats.m1LongestWins, stats.m2LongestWins)}</b><small>{stats.m1LongestWins === stats.m2LongestWins ? "tied" : stats.m1LongestWins > stats.m2LongestWins ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</small></div>
+        <div><span>CURRENT ROUND</span><b>{currentRound.m1Wins}–{currentRound.m2Wins}</b><small>{currentRound.leader ? club(currentRound.leader, "Leader") + " ahead" : "level on weekly wins"}</small></div>
+        <div><span>ROUND POINTS</span><b>{currentRound.m1Points}–{currentRound.m2Points}</b><small>GW {roundStart || "—"}–{roundEnd || "—"}</small></div>
+      </div>
+    </section>
+
+    {milestones.length > 0 && <section className="milestoneGrid" aria-label="Latest rivalry milestones">
+      {milestones.map((milestone) => <article className="card milestoneCard" key={milestone.title}>
+        <span>{milestone.kicker}</span>
+        <b>{milestone.title}</b>
+        <small>{milestone.detail}</small>
+      </article>)}
+    </section>}
+
+    {playerOfWeek && <section className="card playerOfWeek">
+      <div className="playerOfWeekBadge">★</div>
+      <PlayerFace name={playerOfWeek.name} position={playerOfWeek.position} code={playerOfWeek.code} headshot large />
+      <div className="grow">
+        <div className="eyebrow">SoccerTime player of GW {playerOfWeek.gameweek}</div>
+        <h2>{playerOfWeek.name}</h2>
+        <p className="sub">{playerOfWeek.team} · {playerOfWeek.position}{playerOfWeek.tied > 1 ? " · tied with " + String(playerOfWeek.tied - 1) + " other" + (playerOfWeek.tied === 2 ? "" : "s") : ""}</p>
+      </div>
+      <div className="playerOfWeekScore"><b>{playerOfWeek.score}</b><span>ST PTS</span></div>
+    </section>}
 
     <div className="grid2 historyStats">
       <div className="card stat"><span className="tiny">SEASON TABLE</span><b>{number(manager1?.table_points)}–{number(manager2?.table_points)}</b><span className="sub">table points</span></div>
@@ -173,20 +377,47 @@ export default function HistoryClient() {
     <h2>Records</h2>
     <section className="card historyRecords">
       <RecordRow label="Highest team score" value={stats.highest ? `${stats.highest.score} pts` : "—"} detail={stats.highest ? `${highestClub} · GW ${stats.highest.gameweek}` : "Waiting for the first final score"} />
+      <RecordRow label="Lowest team score" value={stats.lowest ? `${stats.lowest.score} pts` : "—"} detail={stats.lowest ? `${lowestClub} · GW ${stats.lowest.gameweek}` : "Waiting for the first final score"} />
       <RecordRow label="Biggest win" value={stats.biggest ? `${biggestMargin} pts` : "—"} detail={stats.biggest ? `${biggestWinner} · GW ${stats.biggest.gameweek}` : "Waiting for the first final score"} />
       <RecordRow label="Closest derby" value={stats.closest ? `${closestMargin} pt${closestMargin === 1 ? "" : "s"}` : "—"} detail={stats.closest ? `GW ${stats.closest.gameweek} · ${number(stats.closest.manager1_score)}–${number(stats.closest.manager2_score)}` : "Waiting for the first final score"} />
       <RecordRow label="Highest combined score" value={stats.combined ? `${number(stats.combined.manager1_score) + number(stats.combined.manager2_score)} pts` : "—"} detail={stats.combined ? `GW ${stats.combined.gameweek}` : "Waiting for the first final score"} />
+      <RecordRow label={`${club(manager1, "Manager 1")} longest streak`} value={`${stats.m1LongestWins}W`} detail={`Current: ${streakLabel(stats.m1Current)}`} />
+      <RecordRow label={`${club(manager2, "Manager 2")} longest streak`} value={`${stats.m2LongestWins}W`} detail={`Current: ${streakLabel(stats.m2Current)}`} />
     </section>
 
-    <h2>Round champions</h2>
+    <h2>Round race</h2>
+    <section className="card roundRaceCard">
+      <div className="historyGameTop"><span className="eyebrow">Round {roundNo || 1} · GW {roundStart || "—"}–{roundEnd || "—"}</span><span className="pill">{currentRound.games.length}/4 FINAL</span></div>
+      <div className="roundRaceScore">
+        <div><span>{club(manager1, "Manager 1")}</span><b>{currentRound.m1Wins}</b><small>{currentRound.m1Points} pts</small></div>
+        <strong>–</strong>
+        <div><span>{club(manager2, "Manager 2")}</span><b>{currentRound.m2Wins}</b><small>{currentRound.m2Points} pts</small></div>
+      </div>
+      <p className="sub">{currentRound.leader ? club(currentRound.leader, "Leader") + " currently controls the round." : "The current round is level."}</p>
+    </section>
+
+    <h2>Round recaps</h2>
     <section className="card">
       {roundResults.length ? roundResults.map((round) => {
         const winner = round.winner_slot === 1 ? manager1 : round.winner_slot === 2 ? manager2 : undefined;
-        return <div className="historyRound" key={round.round_no}>
+        const start = leagueStart + (Number(round.round_no) - 1) * 4;
+        const end = Math.min(start + 3, 38);
+        const games = completed.filter((game) => Number(game.gameweek) >= start && Number(game.gameweek) <= end);
+        const closest = games.length ? [...games].sort((a, b) => Math.abs(number(a.manager1_score) - number(a.manager2_score)) - Math.abs(number(b.manager1_score) - number(b.manager2_score)))[0] : null;
+        const teamGames: TeamGame[] = games.flatMap((game) => [
+          { slot: 1, gameweek: Number(game.gameweek), score: number(game.manager1_score) },
+          { slot: 2, gameweek: Number(game.gameweek), score: number(game.manager2_score) },
+        ]);
+        const high = teamGames.length ? [...teamGames].sort((a, b) => b.score - a.score)[0] : null;
+        return <div className="historyRound roundRecap" key={round.round_no}>
           <div className="historyRoundTrophy">🏆</div>
           <div className="grow">
             <div className="name">Round {round.round_no} · {winner ? club(winner, "Champion") : "Shared"}</div>
-            <div className="meta">Weekly wins {round.manager1_wins}–{round.manager2_wins} · SoccerTime points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
+            <div className="meta">GW {start}–{end} · Weekly wins {round.manager1_wins}–{round.manager2_wins} · SoccerTime points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
+            {(closest || high) && <div className="roundRecapFacts">
+              {closest && <span>Closest: GW {closest.gameweek} by {Math.abs(number(closest.manager1_score) - number(closest.manager2_score))}</span>}
+              {high && <span>High: {high.score} by {high.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</span>}
+            </div>}
           </div>
         </div>;
       }) : <div className="emptyState"><div className="emptyIcon" aria-hidden="true">🏆</div><b>No Round champion yet</b><span>The first champion will be crowned after GW {roundEnd || 7}.</span></div>}

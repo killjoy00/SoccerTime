@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
+import { fetchFplJson } from "@/lib/fpl-server";
 
 export const revalidate = 300;
-const BASE = "https://fantasy.premierleague.com/api";
-
-async function get(path: string) {
-  const response = await fetch(`${BASE}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-    next: { revalidate: 300 },
-  });
-  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
-  return response.json();
-}
-
 export async function GET() {
   try {
-    const [bootstrap, rawFixtures] = await Promise.all([get("/bootstrap-static/"), get("/fixtures/")]);
+    const [bootstrapResult, fixturesResult] = await Promise.all([
+      fetchFplJson<any>("/bootstrap-static/", { staleIfError: true }),
+      fetchFplJson<any[]>("/fixtures/", { staleIfError: true }),
+    ]);
+    const bootstrap = bootstrapResult.data;
+    const rawFixtures = fixturesResult.data;
     const teams = new Map<number, any>(bootstrap.teams.map((team: any) => [team.id, team]));
     const position = new Map<number, string>(
       bootstrap.element_types.map((type: any) => [
@@ -82,7 +73,12 @@ export async function GET() {
 
     return NextResponse.json({
       provider: "official-fpl-public-api",
-      updatedAt: new Date().toISOString(),
+      updatedAt: bootstrapResult.meta.updatedAt,
+      freshness: {
+        state: bootstrapResult.meta.stale || fixturesResult.meta.stale ? "stale" : "fresh",
+        bootstrap: bootstrapResult.meta,
+        fixtures: fixturesResult.meta,
+      },
       currentEvent: current?.id || 1,
       finishedEvents,
       players,

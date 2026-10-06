@@ -1,21 +1,8 @@
-import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeRpc } from "@/lib/neon-server";
+import { fetchFplJson } from "@/lib/fpl-server";
 import { soccerTimeScore, type FplExplain, type FplScoreStats } from "@/lib/scoring";
 
-const FPL = "https://fantasy.premierleague.com/api";
 const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
-
-async function fplJson(path: string) {
-  const response = await fetch(`${FPL}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
-  return response.json();
-}
 
 function scoreBySlot(state: any, scores: Record<string, number>, slot: number) {
   const manager = (state.managers || []).find((item: any) => Number(item.slot) === slot);
@@ -38,24 +25,29 @@ export type ProgressResult = {
 };
 
 export async function progressSoccerTimeGameweeks(source: "cron" | "app"): Promise<ProgressResult> {
-  const oidcToken = await getSoccerTimeOidcToken();
-  if (!oidcToken) return { ok: false, finalized: [], error: "Missing workload identity" };
-
   try {
-    const bootstrap = await fplJson("/bootstrap-static/") as {
+    // Finalization deliberately requires fresh FPL data. Last-known-good cache is only
+    // for display/health resilience and is never trusted to close a Gameweek.
+    const bootstrapResult = await fetchFplJson<{
       events: Array<{ id: number; finished: boolean; data_checked: boolean }>;
-    };
+    }>("/bootstrap-static/", { staleIfError: false });
     const confirmed = new Set(
-      bootstrap.events.filter((event) => event.finished && event.data_checked).map((event) => event.id),
+      bootstrapResult.data.events.filter((event) => event.finished && event.data_checked).map((event) => event.id),
     );
     const finalized: Array<{ gameweek: number; manager1: number; manager2: number }> = [];
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const stateResult = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
+      const stateResult = await soccerTimeRpc(
+        "league_state_by_id",
+        { p_league_id: LEAGUE_ID },
+        { source: `progress:${source}` },
+      );
       if (!stateResult.ok || !stateResult.payload?.ok) {
         console.error("SoccerTime progression state RPC failed", {
+          dependency: "neon",
           source,
           status: stateResult.status,
+          attempts: stateResult.attempts,
           error: stateResult.payload?.error || "unknown",
         });
         return { ok: false, finalized, error: stateResult.payload?.error || "League state unavailable" };
@@ -76,26 +68,35 @@ export async function progressSoccerTimeGameweeks(source: "cron" | "app"): Promi
         return { ok: true, finalized, activeGameweek: gameweek, waitingFor: "already-final" };
       }
 
-      const live = await fplJson(`/event/${gameweek}/live/`) as {
+      const liveResult = await fetchFplJson<{
         elements: Array<{ id: number; stats?: FplScoreStats; explain?: FplExplain[] }>;
-      };
+      }>(`/event/${gameweek}/live/`, { staleIfError: false });
       const scores = Object.fromEntries(
-        (live.elements || []).map((element) => [String(element.id), soccerTimeScore(element.stats, element.explain)]),
+        (liveResult.data.elements || []).map((element) => [
+          String(element.id),
+          soccerTimeScore(element.stats, element.explain),
+        ]),
       );
       const manager1 = scoreBySlot(state, scores, 1);
       const manager2 = scoreBySlot(state, scores, 2);
 
-      const finalize = await neonRpc(oidcToken, "finalize_gameweek_by_id", {
-        p_league_id: LEAGUE_ID,
-        p_gameweek: gameweek,
-        p_manager1_score: manager1,
-        p_manager2_score: manager2,
-      });
+      const finalize = await soccerTimeRpc(
+        "finalize_gameweek_by_id",
+        {
+          p_league_id: LEAGUE_ID,
+          p_gameweek: gameweek,
+          p_manager1_score: manager1,
+          p_manager2_score: manager2,
+        },
+        { source: `progress:${source}` },
+      );
       if (!finalize.ok || !finalize.payload?.ok) {
         console.error("SoccerTime progression finalize RPC failed", {
+          dependency: "neon",
           source,
           gameweek,
           status: finalize.status,
+          attempts: finalize.attempts,
           error: finalize.payload?.error || "unknown",
         });
         return { ok: false, finalized, activeGameweek: gameweek, error: finalize.payload?.error || "Finalization failed" };
@@ -105,13 +106,17 @@ export async function progressSoccerTimeGameweeks(source: "cron" | "app"): Promi
       console.info("SoccerTime Gameweek finalized", { source, gameweek, manager1, manager2 });
     }
 
-    const stateResult = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
+    const stateResult = await soccerTimeRpc(
+      "league_state_by_id",
+      { p_league_id: LEAGUE_ID },
+      { source: `progress:${source}` },
+    );
     const activeGameweek = stateResult.ok && stateResult.payload?.ok
       ? Number(stateResult.payload.league?.active_gameweek)
       : undefined;
     return { ok: true, finalized, activeGameweek };
   } catch (error) {
-    console.error("SoccerTime progression failed", { source, error });
+    console.error("SoccerTime progression failed", { dependency: "fpl", source, error });
     return {
       ok: false,
       finalized: [],

@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchFplJson } from "@/lib/fpl-server";
 import { soccerTimeScore, type FplExplain, type FplScoreStats } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
-
-const FPL = "https://fantasy.premierleague.com/api";
-
-async function fplJson(path: string) {
-  const response = await fetch(`${FPL}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
-  return response.json();
-}
 
 export async function GET(request: NextRequest) {
   const raw = Number(request.nextUrl.searchParams.get("gw"));
@@ -24,12 +10,14 @@ export async function GET(request: NextRequest) {
   if (!gw) return NextResponse.json({ error: "Invalid gameweek" }, { status: 400 });
 
   try {
-    const [live, rawFixtures] = await Promise.all([
-      fplJson(`/event/${gw}/live/`) as Promise<{
+    const [liveResult, fixturesResult] = await Promise.all([
+      fetchFplJson<{
         elements: Array<{ id: number; stats?: FplScoreStats; explain?: FplExplain[] }>;
-      }>,
-      fplJson(`/fixtures/?event=${gw}`) as Promise<Array<any>>,
+      }>(`/event/${gw}/live/`, { staleIfError: true }),
+      fetchFplJson<Array<any>>(`/fixtures/?event=${gw}`, { staleIfError: true }),
     ]);
+    const live = liveResult.data;
+    const rawFixtures = fixturesResult.data;
 
     const scores = Object.fromEntries(
       (live.elements || []).map((element) => [
@@ -47,10 +35,34 @@ export async function GET(request: NextRequest) {
       awayGoals: fixture.team_a_score == null ? null : Number(fixture.team_a_score),
     }));
 
-    return NextResponse.json({ gw, scores, fixtures, updatedAt: new Date().toISOString() });
+    const stale = liveResult.meta.stale || fixturesResult.meta.stale;
+    const updatedAt = liveResult.meta.updatedAt;
+    const warnings = [liveResult.meta.warning, fixturesResult.meta.warning].filter(Boolean);
+
+    return NextResponse.json({
+      gw,
+      scores,
+      fixtures,
+      updatedAt,
+      freshness: {
+        state: stale ? "stale" : "fresh",
+        source: stale ? "last-known-good" : "fpl",
+        ageSeconds: liveResult.meta.ageSeconds,
+        attempts: Math.max(liveResult.meta.attempts, fixturesResult.meta.attempts),
+        warning: warnings[0] || null,
+      },
+    }, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
   } catch (error) {
+    console.error("SoccerTime live scoring unavailable", { dependency: "fpl", gameweek: gw, error });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "FPL live feed unavailable" },
+      {
+        error: error instanceof Error ? error.message : "FPL live feed unavailable",
+        freshness: { state: "unavailable", source: "none" },
+      },
       { status: 502 },
     );
   }

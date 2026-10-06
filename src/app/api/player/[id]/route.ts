@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { soccerTimeScore } from "@/lib/scoring";
+import { fetchFplJson } from "@/lib/fpl-server";
 
 export const revalidate = 300;
-
-const FPL = "https://fantasy.premierleague.com/api";
-
-async function fplJson(path: string) {
-  const response = await fetch(`${FPL}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-    next: { revalidate: 300 },
-  });
-  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
-  return response.json();
-}
 
 export async function GET(
   _request: NextRequest,
@@ -29,10 +15,12 @@ export async function GET(
   }
 
   try {
-    const [bootstrap, summary] = await Promise.all([
-      fplJson("/bootstrap-static/"),
-      fplJson(`/element-summary/${playerId}/`),
+    const [bootstrapResult, summaryResult] = await Promise.all([
+      fetchFplJson<any>("/bootstrap-static/", { staleIfError: true }),
+      fetchFplJson<any>(`/element-summary/${playerId}/`, { staleIfError: true }),
     ]);
+    const bootstrap = bootstrapResult.data;
+    const summary = summaryResult.data;
     const player = bootstrap.elements.find((item: any) => Number(item.id) === playerId);
     if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });
 
@@ -109,6 +97,10 @@ export async function GET(
       news: player.news || "",
       status: player.status,
       chanceOfPlayingNextRound: player.chance_of_playing_next_round,
+      freshness: {
+        state: bootstrapResult.meta.stale || summaryResult.meta.stale ? "stale" : "fresh",
+        updatedAt: summaryResult.meta.updatedAt,
+      },
     });
   } catch (error) {
     return NextResponse.json(
