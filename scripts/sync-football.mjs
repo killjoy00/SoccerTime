@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
-
-const BASE = "https://fantasy.premierleague.com/api";
+import { fplApi as api } from "./fpl-http.mjs";
 
 function number(value) {
   const parsed = Number(value || 0);
@@ -33,18 +32,6 @@ function soccerTimeScore(stats = {}, explain = []) {
     - number(stats.penalties_missed);
 }
 
-
-async function api(path) {
-  const response = await fetch(`${BASE}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-  });
-  if (!response.ok) throw new Error(`${path}: ${response.status}`);
-  return response.json();
-}
 
 const bootstrap = await api("/bootstrap-static/");
 const rawFixtures = await api("/fixtures/");
