@@ -1,25 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeRpc } from "@/lib/neon-server";
+import { fetchFplJson } from "@/lib/fpl-server";
 import { soccerTimeScore, type FplExplain, type FplScoreStats } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
-const FPL = "https://fantasy.premierleague.com/api";
 const LEAGUE_ID = "a96ae9f9-cd1a-4079-af67-1a8edc3ce331";
 const QUOTAS: Record<string, number> = { GK: 1, DEF: 2, MID: 3, FWD: 2 };
-
-async function fplJson(path: string) {
-  const response = await fetch(`${FPL}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
-  return response.json();
-}
 
 function rosterIsValid(picks: any[]) {
   if (picks.length !== 8) return false;
@@ -46,13 +33,19 @@ export async function GET() {
     return NextResponse.json({ ok: false, stage: "environment" }, { status: 403 });
   }
 
-  const oidcToken = await getSoccerTimeOidcToken();
-  if (!oidcToken) return NextResponse.json({ ok: false, stage: "identity" }, { status: 503 });
-
   try {
-    const stateResult = await neonRpc(oidcToken, "league_state_by_id", { p_league_id: LEAGUE_ID });
+    const stateResult = await soccerTimeRpc(
+      "league_state_by_id",
+      { p_league_id: LEAGUE_ID },
+      { source: "health:e2e" },
+    );
     if (!stateResult.ok || !stateResult.payload?.ok) {
-      return NextResponse.json({ ok: false, stage: "state", rpcStatus: stateResult.status }, { status: 503 });
+      return NextResponse.json({
+        ok: false,
+        stage: "state",
+        rpcStatus: stateResult.status,
+        rpcAttempts: stateResult.attempts,
+      }, { status: 503 });
     }
 
     const state = stateResult.payload;
@@ -68,12 +61,24 @@ export async function GET() {
       picks.some((pick: any) => pick.manager_id === captain.manager_id && pick.player_id === captain.player_id),
     );
 
-    const [bootstrap, fixtures, live] = await Promise.all([
-      fplJson("/bootstrap-static/") as Promise<{events:Array<{id:number;finished:boolean;data_checked:boolean}>}>,
-      fplJson("/fixtures/") as Promise<Array<{event:number|null;started:boolean;kickoff_time:string|null}>>,
-      fplJson(`/event/${gameweek}/live/`) as Promise<{elements:Array<{id:number;stats?:FplScoreStats;explain?:FplExplain[]}>}>,
+    const [bootstrapResult, fixturesResult, liveResult] = await Promise.all([
+      fetchFplJson<{ events: Array<{ id: number; finished: boolean; data_checked: boolean }> }>(
+        "/bootstrap-static/",
+        { staleIfError: true },
+      ),
+      fetchFplJson<Array<{ event: number | null; started: boolean; kickoff_time: string | null }>>(
+        "/fixtures/",
+        { staleIfError: true },
+      ),
+      fetchFplJson<{ elements: Array<{ id: number; stats?: FplScoreStats; explain?: FplExplain[] }> }>(
+        `/event/${gameweek}/live/`,
+        { staleIfError: true },
+      ),
     ]);
 
+    const bootstrap = bootstrapResult.data;
+    const fixtures = fixturesResult.data;
+    const live = liveResult.data;
     const gwFixtures = fixtures.filter((fixture) => Number(fixture.event) === gameweek);
     const gameweekStarted = gwFixtures.some((fixture) => fixture.started || Boolean(
       fixture.kickoff_time && Date.parse(fixture.kickoff_time) <= Date.now(),
@@ -85,9 +90,11 @@ export async function GET() {
     );
     const scoresFinite = managers.every((manager: any) => Number.isFinite(scoreForManager(state, liveScores, manager.id)));
 
-    const movesResult = await neonRpc(oidcToken, "roster_moves_state", {
-      p_code: String(state.league?.join_code || ""),
-    });
+    const movesResult = await soccerTimeRpc(
+      "roster_moves_state",
+      { p_code: String(state.league?.join_code || "") },
+      { source: "health:e2e" },
+    );
     const movesReadable = movesResult.ok && Boolean(movesResult.payload?.ok);
 
     const checks = {
@@ -104,7 +111,18 @@ export async function GET() {
     };
     const criticalChecks = { ...checks, captainCountOk: true };
     const ok = Object.values(criticalChecks).every(Boolean);
-    const warnings = captainCountOk ? [] : [`${managers.length - (state.captains || []).length} manager(s) have no Gameweek ${gameweek} captain`];
+
+    const fplFallbacks = [
+      ["bootstrap", bootstrapResult.meta],
+      ["fixtures", fixturesResult.meta],
+      ["live", liveResult.meta],
+    ].filter(([, meta]) => (meta as typeof bootstrapResult.meta).stale);
+    const warnings: string[] = [];
+    if (!captainCountOk) warnings.push(`${managers.length - (state.captains || []).length} manager(s) have no Gameweek ${gameweek} captain`);
+    for (const [name, metaRaw] of fplFallbacks) {
+      const meta = metaRaw as typeof bootstrapResult.meta;
+      warnings.push(`FPL ${name} feed is using last-known-good data from ${meta.updatedAt}`);
+    }
 
     return NextResponse.json({
       ok,
@@ -114,10 +132,19 @@ export async function GET() {
       managerCount: managers.length,
       pickCount: picks.length,
       transactionCount: movesReadable ? Number((movesResult.payload.moves || []).length) : null,
+      dependencies: {
+        neon: { attempts: Math.max(stateResult.attempts, movesResult.attempts) },
+        fpl: {
+          fresh: fplFallbacks.length === 0,
+          bootstrap: bootstrapResult.meta,
+          fixtures: fixturesResult.meta,
+          live: liveResult.meta,
+        },
+      },
       warnings,
     }, { status: ok ? 200 : 503 });
   } catch (error) {
-    console.error("SoccerTime end-to-end health check failed", error);
+    console.error("SoccerTime end-to-end health check failed", { stage: "external-feed", error });
     return NextResponse.json({ ok: false, stage: "external-feed" }, { status: 502 });
   }
 }
