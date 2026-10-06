@@ -1,39 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeRpc } from "@/lib/neon-server";
 import { progressSoccerTimeGameweeks } from "@/lib/gameweek-progress";
 import { normalizeLeagueCode } from "@/lib/league-code";
-
-const FPL = "https://fantasy.premierleague.com/api";
-const RPC_NAMES: Record<string, string> = {
-  league_state: "league_state_workload",
-  draft_pick: "draft_pick_workload",
-  set_captain: "set_captain_workload",
-  pickup_player: "pickup_player_workload",
-  save_manager: "save_manager_workload",
-};
-const GAMEWEEK_LOCKED_ACTIONS = new Set(["set_captain", "pickup_player"]);
-
-async function fplJson(path: string) {
-  const response = await fetch(`${FPL}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`FPL ${path}: ${response.status}`);
-  return response.json();
-}
+import { fetchFplJson } from "@/lib/fpl-server";
 
 async function hasGameweekStarted(gameweek: unknown) {
   const gw = Number(gameweek);
   if (!Number.isInteger(gw) || gw < 1 || gw > 38) throw new Error("Invalid Gameweek");
-  const fixtures = (await fplJson("/fixtures/")) as Array<{
+  const { data: fixtures } = await fetchFplJson<Array<{
     event: number | null;
     kickoff_time: string | null;
     started: boolean;
-  }>;
+  }>>("/fixtures/", { staleIfError: true });
   const gameweekFixtures = fixtures.filter((fixture) => Number(fixture.event) === gw);
   if (!gameweekFixtures.length) throw new Error("No Gameweek fixtures found");
   return gameweekFixtures.some((fixture) =>
@@ -46,11 +24,11 @@ async function verifiedPlayerBody(name: string, body: Record<string, unknown>) {
   const idField = name === "pickup_player" ? "p_add_player_id" : "p_player_id";
   const playerId = Number(body[idField]);
   if (!Number.isInteger(playerId) || playerId <= 0) throw new Error("Invalid player");
-  const bootstrap = await fplJson("/bootstrap-static/") as {
+  const { data: bootstrap } = await fetchFplJson<{
     elements: Array<{id:number;web_name:string;team:number;element_type:number;status:string}>;
     teams: Array<{id:number;name:string}>;
     element_types: Array<{id:number;singular_name_short:string}>;
-  };
+  }>("/bootstrap-static/", { staleIfError: true });
   const player = bootstrap.elements.find((item) => item.id === playerId);
   if (!player || player.status === "u") throw new Error("Player is not available");
   const positionRaw = bootstrap.element_types.find((item) => item.id === player.element_type)?.singular_name_short;
@@ -97,13 +75,10 @@ export async function POST(
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not verify request" }, { status: 503 });
   }
 
-  const oidcToken = await getSoccerTimeOidcToken();
-  if (!oidcToken) return NextResponse.json({ error: "Missing workload identity" }, { status: 503 });
-
   try {
-    const result = await neonRpc(oidcToken, rpcName, body);
+    const result = await soccerTimeRpc(rpcName, body, { source: `api:${name}` });
     if (!result.ok) {
-      console.error("Neon workload RPC failed", { name, status: result.status, body: result.text.slice(0, 1000) });
+      console.error("Neon workload RPC failed", { dependency: "neon", name, status: result.status, attempts: result.attempts, body: result.text.slice(0, 1000) });
     }
     return new Response(result.text, {
       status: result.status,
