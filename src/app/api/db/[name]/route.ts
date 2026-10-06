@@ -4,6 +4,15 @@ import { progressSoccerTimeGameweeks } from "@/lib/gameweek-progress";
 import { normalizeLeagueCode } from "@/lib/league-code";
 import { fetchFplJson } from "@/lib/fpl-server";
 
+const RPC_NAMES: Record<string, string> = {
+  league_state: "league_state_workload",
+  draft_pick: "draft_pick_workload",
+  set_captain: "set_captain_workload",
+  pickup_player: "pickup_player_workload",
+  save_manager: "save_manager_workload",
+};
+const GAMEWEEK_LOCKED_ACTIONS = new Set(["set_captain", "pickup_player"]);
+
 async function hasGameweekStarted(gameweek: unknown) {
   const gw = Number(gameweek);
   if (!Number.isInteger(gw) || gw < 1 || gw > 38) throw new Error("Invalid Gameweek");
