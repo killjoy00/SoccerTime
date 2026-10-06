@@ -15,4 +15,5 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm test
+      - run: node --check scripts/sync-football.mjs
       - run: npm run build

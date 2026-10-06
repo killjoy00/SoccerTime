@@ -20,7 +20,7 @@ async function hasGameweekStarted(gameweek: unknown) {
     event: number | null;
     kickoff_time: string | null;
     started: boolean;
-  }>>("/fixtures/", { staleIfError: true });
+  }>>("/fixtures/", { staleIfError: false });
   const gameweekFixtures = fixtures.filter((fixture) => Number(fixture.event) === gw);
   if (!gameweekFixtures.length) throw new Error("No Gameweek fixtures found");
   return gameweekFixtures.some((fixture) =>
@@ -37,7 +37,7 @@ async function verifiedPlayerBody(name: string, body: Record<string, unknown>) {
     elements: Array<{id:number;web_name:string;team:number;element_type:number;status:string}>;
     teams: Array<{id:number;name:string}>;
     element_types: Array<{id:number;singular_name_short:string}>;
-  }>("/bootstrap-static/", { staleIfError: true });
+  }>("/bootstrap-static/", { staleIfError: false });
   const player = bootstrap.elements.find((item) => item.id === playerId);
   if (!player || player.status === "u") throw new Error("Player is not available");
   const positionRaw = bootstrap.element_types.find((item) => item.id === player.element_type)?.singular_name_short;
