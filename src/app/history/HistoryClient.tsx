@@ -400,11 +400,24 @@ export default function HistoryClient() {
     <section className="card">
       {roundResults.length ? roundResults.map((round) => {
         const winner = round.winner_slot === 1 ? manager1 : round.winner_slot === 2 ? manager2 : undefined;
-        return <div className="historyRound" key={round.round_no}>
+        const start = leagueStart + (Number(round.round_no) - 1) * 4;
+        const end = Math.min(start + 3, 38);
+        const games = completed.filter((game) => Number(game.gameweek) >= start && Number(game.gameweek) <= end);
+        const closest = games.length ? [...games].sort((a, b) => Math.abs(number(a.manager1_score) - number(a.manager2_score)) - Math.abs(number(b.manager1_score) - number(b.manager2_score)))[0] : null;
+        const teamGames: TeamGame[] = games.flatMap((game) => [
+          { slot: 1, gameweek: Number(game.gameweek), score: number(game.manager1_score) },
+          { slot: 2, gameweek: Number(game.gameweek), score: number(game.manager2_score) },
+        ]);
+        const high = teamGames.length ? [...teamGames].sort((a, b) => b.score - a.score)[0] : null;
+        return <div className="historyRound roundRecap" key={round.round_no}>
           <div className="historyRoundTrophy">🏆</div>
           <div className="grow">
             <div className="name">Round {round.round_no} · {winner ? club(winner, "Champion") : "Shared"}</div>
-            <div className="meta">Weekly wins {round.manager1_wins}–{round.manager2_wins} · SoccerTime points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
+            <div className="meta">GW {start}–{end} · Weekly wins {round.manager1_wins}–{round.manager2_wins} · SoccerTime points {number(round.manager1_points)}–{number(round.manager2_points)}</div>
+            {(closest || high) && <div className="roundRecapFacts">
+              {closest && <span>Closest: GW {closest.gameweek} by {Math.abs(number(closest.manager1_score) - number(closest.manager2_score))}</span>}
+              {high && <span>High: {high.score} by {high.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</span>}
+            </div>}
           </div>
         </div>;
       }) : <div className="emptyState"><div className="emptyIcon" aria-hidden="true">🏆</div><b>No Round champion yet</b><span>The first champion will be crowned after GW {roundEnd || 7}.</span></div>}
