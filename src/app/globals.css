@@ -1327,3 +1327,43 @@ h3{letter-spacing:-.18px}
   .playerOfWeek{gap:9px}
   .playerOfWeekScore{flex-basis:50px}
 }
+
+
+.seasonRecapCard{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 100% 0,rgba(255,216,106,.20),transparent 40%),
+    linear-gradient(145deg,#fffefa,#f7f2ff);
+  border-color:rgba(115,95,223,.15);
+}
+.seasonRecapGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin:14px 0 10px;
+}
+.seasonRecapGrid>div{
+  min-width:0;
+  border:1px solid rgba(115,95,223,.10);
+  border-radius:13px;
+  padding:10px;
+  background:rgba(255,255,255,.72);
+}
+.seasonRecapGrid span{
+  display:block;
+  color:#6e74a6;
+  font-size:7px;
+  font-weight:950;
+  letter-spacing:.65px;
+}
+.seasonRecapGrid b{
+  display:block;
+  margin:4px 0 2px;
+  font-size:17px;
+}
+.seasonRecapGrid small{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+}
+.seasonRecapCard>.sub{margin-bottom:0}

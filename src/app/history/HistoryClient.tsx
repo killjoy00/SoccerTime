@@ -323,6 +323,14 @@ export default function HistoryClient() {
   const leagueStart = completed.length
     ? Math.min(...completed.map((game) => Number(game.gameweek)))
     : (roundStart || activeGameweek || 1);
+  const latestGame = completed[0] || null;
+  const latestScore1 = latestGame ? number(latestGame.manager1_score) : 0;
+  const latestScore2 = latestGame ? number(latestGame.manager2_score) : 0;
+  const latestWinnerSlot: 1 | 2 | null = !latestGame || latestScore1 === latestScore2 ? null : latestScore1 > latestScore2 ? 1 : 2;
+  const pulseStreak = latestWinnerSlot === 1 ? stats.m1Current : latestWinnerSlot === 2 ? stats.m2Current : latestGame ? stats.m1Current : { kind: "—" as const, count: 0 };
+  const pulseManager = latestWinnerSlot === 1 ? manager1 : latestWinnerSlot === 2 ? manager2 : undefined;
+  const roundWins1 = roundResults.filter((round) => Number(round.winner_slot) === 1).length;
+  const roundWins2 = roundResults.filter((round) => Number(round.winner_slot) === 2).length;
 
   return <><main className="shell historyShell theme-history">
     <HistoryHeader />
@@ -343,12 +351,26 @@ export default function HistoryClient() {
         <span className="pill">{seasonFinished ? "CHAMPION" : "ROUND " + String(roundNo || 1)}</span>
       </div>
       <div className="rivalryPulseGrid">
-        <div><span>CURRENT STREAK</span><b>{stats.m1Current.count >= stats.m2Current.count ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</b><small>{stats.m1Current.count >= stats.m2Current.count ? streakLabel(stats.m1Current) : streakLabel(stats.m2Current)}</small></div>
+        <div><span>CURRENT STREAK</span><b>{pulseManager ? club(pulseManager, "Leader") : latestGame ? "Draw streak" : "No results"}</b><small>{streakLabel(pulseStreak)}</small></div>
         <div><span>LONGEST WIN STREAK</span><b>{Math.max(stats.m1LongestWins, stats.m2LongestWins)}</b><small>{stats.m1LongestWins === stats.m2LongestWins ? "tied" : stats.m1LongestWins > stats.m2LongestWins ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</small></div>
         <div><span>CURRENT ROUND</span><b>{currentRound.m1Wins}–{currentRound.m2Wins}</b><small>{currentRound.leader ? club(currentRound.leader, "Leader") + " ahead" : "level on weekly wins"}</small></div>
         <div><span>ROUND POINTS</span><b>{currentRound.m1Points}–{currentRound.m2Points}</b><small>GW {roundStart || "—"}–{roundEnd || "—"}</small></div>
       </div>
     </section>
+
+    {seasonFinished && <section className="card seasonRecapCard">
+      <div className="historyGameTop">
+        <div><div className="eyebrow">Season archive</div><h2>{seasonLeader ? club(seasonLeader, "Champion") : "Shared championship"}</h2></div>
+        <span className="pill">FINAL</span>
+      </div>
+      <div className="seasonRecapGrid">
+        <div><span>HEAD TO HEAD</span><b>{stats.m1Wins}–{stats.m2Wins}</b><small>{stats.draws} draw{stats.draws === 1 ? "" : "s"}</small></div>
+        <div><span>TABLE POINTS</span><b>{number(manager1?.table_points)}–{number(manager2?.table_points)}</b><small>final table</small></div>
+        <div><span>SOCCERTIME PTS</span><b>{number(manager1?.fantasy_points)}–{number(manager2?.fantasy_points)}</b><small>season scoring</small></div>
+        <div><span>ROUNDS WON</span><b>{roundWins1}–{roundWins2}</b><small>{roundResults.length} completed</small></div>
+      </div>
+      <p className="sub">Highest score: {stats.highest ? `${stats.highest.score} by ${highestClub}` : "—"} · Biggest win: {stats.biggest ? `${biggestMargin} by ${biggestWinner}` : "—"}.</p>
+    </section>}
 
     {milestones.length > 0 && <section className="milestoneGrid" aria-label="Latest rivalry milestones">
       {milestones.map((milestone) => <article className="card milestoneCard" key={milestone.title}>
