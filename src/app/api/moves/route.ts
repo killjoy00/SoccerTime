@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSoccerTimeOidcToken, neonRpc } from "@/lib/neon-server";
+import { soccerTimeRpc } from "@/lib/neon-server";
 import { normalizeLeagueCode } from "@/lib/league-code";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,8 @@ export async function GET(request: NextRequest) {
   if (!rawCode) return NextResponse.json({ error: "League code required" }, { status: 400 });
   const code = normalizeLeagueCode(rawCode);
 
-  const oidcToken = await getSoccerTimeOidcToken();
-  if (!oidcToken) return NextResponse.json({ error: "Missing workload identity" }, { status: 503 });
-
   try {
-    const result = await neonRpc(oidcToken, "roster_moves_state", { p_code: code });
+    const result = await soccerTimeRpc("roster_moves_state", { p_code: code }, { source: "api:moves" });
     if (!result.ok) {
       console.error("Roster move history RPC failed", { status: result.status, error: result.payload?.error });
       return NextResponse.json({ error: result.payload?.error || "Move history unavailable" }, { status: result.status });
