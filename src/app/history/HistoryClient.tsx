@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import BottomNav from "../BottomNav";
+import PlayerFace from "../PlayerFace";
 import { rpc } from "@/lib/neon";
 
 type Manager = {
@@ -50,12 +51,75 @@ type TeamGame = {
   score: number;
 };
 
+type StaticPlayer = {
+  id: number;
+  code?: number;
+  name: string;
+  team: string;
+  position: string;
+};
+
+type StaticData = {
+  players?: StaticPlayer[];
+  scores?: Record<string, Record<string, number>>;
+};
+
+type Streak = {
+  kind: "W" | "D" | "L" | "—";
+  count: number;
+};
+
 function number(value: number | string | null | undefined) {
   return Number(value || 0);
 }
 
 function club(manager: Manager | undefined, fallback: string) {
   return manager?.club_name || fallback;
+}
+
+function resultForSlot(game: Matchup, slot: 1 | 2): "W" | "D" | "L" {
+  const mine = number(slot === 1 ? game.manager1_score : game.manager2_score);
+  const theirs = number(slot === 1 ? game.manager2_score : game.manager1_score);
+  return mine === theirs ? "D" : mine > theirs ? "W" : "L";
+}
+
+function currentStreak(games: Matchup[], slot: 1 | 2): Streak {
+  if (!games.length) return { kind: "—", count: 0 };
+  const sorted = [...games].sort((a, b) => Number(b.gameweek) - Number(a.gameweek));
+  const kind = resultForSlot(sorted[0], slot);
+  let count = 0;
+  for (const game of sorted) {
+    if (resultForSlot(game, slot) !== kind) break;
+    count += 1;
+  }
+  return { kind, count };
+}
+
+function longestWinStreak(games: Matchup[], slot: 1 | 2) {
+  let longest = 0;
+  let current = 0;
+  for (const game of [...games].sort((a, b) => Number(a.gameweek) - Number(b.gameweek))) {
+    if (resultForSlot(game, slot) === "W") {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+  return longest;
+}
+
+function streakLabel(streak: Streak) {
+  if (!streak.count || streak.kind === "—") return "No streak yet";
+  const word = streak.kind === "W" ? "win" : streak.kind === "L" ? "loss" : "draw";
+  return streak.count + " " + word + (streak.count === 1 ? "" : "s") + " straight";
+}
+
+function winnerForGame(game: Matchup, manager1?: Manager, manager2?: Manager) {
+  const score1 = number(game.manager1_score);
+  const score2 = number(game.manager2_score);
+  if (score1 === score2) return "Draw";
+  return score1 > score2 ? club(manager1, "Manager 1") : club(manager2, "Manager 2");
 }
 
 export default function HistoryClient() {
