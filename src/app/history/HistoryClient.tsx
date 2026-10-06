@@ -337,6 +337,38 @@ export default function HistoryClient() {
       <p className="sub">{completed.length ? `${completed.length} completed Gameweek${completed.length === 1 ? "" : "s"} · ${seriesLeader ? `${club(seriesLeader, "Leader")} leads the series` : "series level"}` : `History starts when Gameweek ${activeGameweek || 4} finalizes.`}</p>
     </section>
 
+    <section className="card rivalryPulse">
+      <div className="historyGameTop">
+        <div><div className="eyebrow">{seasonFinished ? "Season champion" : "Rivalry pulse"}</div><h2>{seasonLeader ? club(seasonLeader, "Leader") : "Dead level"}</h2></div>
+        <span className="pill">{seasonFinished ? "CHAMPION" : "ROUND " + String(roundNo || 1)}</span>
+      </div>
+      <div className="rivalryPulseGrid">
+        <div><span>CURRENT STREAK</span><b>{stats.m1Current.count >= stats.m2Current.count ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</b><small>{stats.m1Current.count >= stats.m2Current.count ? streakLabel(stats.m1Current) : streakLabel(stats.m2Current)}</small></div>
+        <div><span>LONGEST WIN STREAK</span><b>{Math.max(stats.m1LongestWins, stats.m2LongestWins)}</b><small>{stats.m1LongestWins === stats.m2LongestWins ? "tied" : stats.m1LongestWins > stats.m2LongestWins ? club(manager1, "Manager 1") : club(manager2, "Manager 2")}</small></div>
+        <div><span>CURRENT ROUND</span><b>{currentRound.m1Wins}–{currentRound.m2Wins}</b><small>{currentRound.leader ? club(currentRound.leader, "Leader") + " ahead" : "level on weekly wins"}</small></div>
+        <div><span>ROUND POINTS</span><b>{currentRound.m1Points}–{currentRound.m2Points}</b><small>GW {roundStart || "—"}–{roundEnd || "—"}</small></div>
+      </div>
+    </section>
+
+    {milestones.length > 0 && <section className="milestoneGrid" aria-label="Latest rivalry milestones">
+      {milestones.map((milestone) => <article className="card milestoneCard" key={milestone.title}>
+        <span>{milestone.kicker}</span>
+        <b>{milestone.title}</b>
+        <small>{milestone.detail}</small>
+      </article>)}
+    </section>}
+
+    {playerOfWeek && <section className="card playerOfWeek">
+      <div className="playerOfWeekBadge">★</div>
+      <PlayerFace name={playerOfWeek.name} position={playerOfWeek.position} code={playerOfWeek.code} headshot large />
+      <div className="grow">
+        <div className="eyebrow">SoccerTime player of GW {playerOfWeek.gameweek}</div>
+        <h2>{playerOfWeek.name}</h2>
+        <p className="sub">{playerOfWeek.team} · {playerOfWeek.position}{playerOfWeek.tied > 1 ? " · tied with " + String(playerOfWeek.tied - 1) + " other" + (playerOfWeek.tied === 2 ? "" : "s") : ""}</p>
+      </div>
+      <div className="playerOfWeekScore"><b>{playerOfWeek.score}</b><span>ST PTS</span></div>
+    </section>}
+
     <div className="grid2 historyStats">
       <div className="card stat"><span className="tiny">SEASON TABLE</span><b>{number(manager1?.table_points)}–{number(manager2?.table_points)}</b><span className="sub">table points</span></div>
       <div className="card stat"><span className="tiny">SOCCERTIME POINTS</span><b>{number(manager1?.fantasy_points)}–{number(manager2?.fantasy_points)}</b><span className="sub">season total</span></div>
