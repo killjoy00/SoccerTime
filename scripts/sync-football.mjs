@@ -59,6 +59,7 @@ async function api(path) {
       });
       if (!response.ok) {
         const error = new Error(`${path}: ${response.status}`);
+        error.status = response.status;
         lastError = error;
         if (attempt + 1 < RETRY_DELAYS_MS.length && retryable(response.status)) {
           console.warn(`FPL retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${path} after HTTP ${response.status}`);
@@ -69,10 +70,12 @@ async function api(path) {
       return response.json();
     } catch (error) {
       lastError = error;
-      if (attempt + 1 < RETRY_DELAYS_MS.length) {
-        console.warn(`FPL retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${path} after network failure`);
+      const status = Number(error?.status || 0);
+      if (attempt + 1 < RETRY_DELAYS_MS.length && (!status || retryable(status))) {
+        console.warn(`FPL retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${path} after ${status ? `HTTP ${status}` : "network failure"}`);
         continue;
       }
+      break;
     }
   }
   throw lastError || new Error(`${path}: FPL request failed`);
