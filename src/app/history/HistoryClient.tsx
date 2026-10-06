@@ -314,18 +314,27 @@ export default function HistoryClient() {
         ? club(manager1, "Manager 1")
         : club(manager2, "Manager 2")
     : "—";
+  const lowestClub = stats.lowest?.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2");
+  const seriesLeader = stats.m1Wins === stats.m2Wins ? null : stats.m1Wins > stats.m2Wins ? manager1 : manager2;
+  const seasonLeader = number(manager1?.table_points) === number(manager2?.table_points)
+    ? (number(manager1?.fantasy_points) === number(manager2?.fantasy_points) ? null : number(manager1?.fantasy_points) > number(manager2?.fantasy_points) ? manager1 : manager2)
+    : number(manager1?.table_points) > number(manager2?.table_points) ? manager1 : manager2;
+  const seasonFinished = completed.some((game) => Number(game.gameweek) === 38);
+  const leagueStart = completed.length
+    ? Math.min(...completed.map((game) => Number(game.gameweek)))
+    : (roundStart || activeGameweek || 1);
 
   return <><main className="shell historyShell theme-history">
     <HistoryHeader />
 
     <section className="card historyHero">
-      <div className="eyebrow">All-time house derby</div>
+      <div className="eyebrow">Season house derby</div>
       <div className="historySeries">
         <div><span>{club(manager1, "Manager 1")}</span><b>{stats.m1Wins}</b></div>
         <div className="historySeriesMid"><strong>{stats.draws}</strong><span>draws</span></div>
         <div><span>{club(manager2, "Manager 2")}</span><b>{stats.m2Wins}</b></div>
       </div>
-      <p className="sub">{completed.length ? `${completed.length} completed Gameweek${completed.length === 1 ? "" : "s"}` : `History starts when Gameweek ${activeGameweek || 4} finalizes.`}</p>
+      <p className="sub">{completed.length ? `${completed.length} completed Gameweek${completed.length === 1 ? "" : "s"} · ${seriesLeader ? `${club(seriesLeader, "Leader")} leads the series` : "series level"}` : `History starts when Gameweek ${activeGameweek || 4} finalizes.`}</p>
     </section>
 
     <div className="grid2 historyStats">
