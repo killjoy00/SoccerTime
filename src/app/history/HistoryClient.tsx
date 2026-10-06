@@ -377,12 +377,26 @@ export default function HistoryClient() {
     <h2>Records</h2>
     <section className="card historyRecords">
       <RecordRow label="Highest team score" value={stats.highest ? `${stats.highest.score} pts` : "—"} detail={stats.highest ? `${highestClub} · GW ${stats.highest.gameweek}` : "Waiting for the first final score"} />
+      <RecordRow label="Lowest team score" value={stats.lowest ? `${stats.lowest.score} pts` : "—"} detail={stats.lowest ? `${lowestClub} · GW ${stats.lowest.gameweek}` : "Waiting for the first final score"} />
       <RecordRow label="Biggest win" value={stats.biggest ? `${biggestMargin} pts` : "—"} detail={stats.biggest ? `${biggestWinner} · GW ${stats.biggest.gameweek}` : "Waiting for the first final score"} />
       <RecordRow label="Closest derby" value={stats.closest ? `${closestMargin} pt${closestMargin === 1 ? "" : "s"}` : "—"} detail={stats.closest ? `GW ${stats.closest.gameweek} · ${number(stats.closest.manager1_score)}–${number(stats.closest.manager2_score)}` : "Waiting for the first final score"} />
       <RecordRow label="Highest combined score" value={stats.combined ? `${number(stats.combined.manager1_score) + number(stats.combined.manager2_score)} pts` : "—"} detail={stats.combined ? `GW ${stats.combined.gameweek}` : "Waiting for the first final score"} />
+      <RecordRow label={`${club(manager1, "Manager 1")} longest streak`} value={`${stats.m1LongestWins}W`} detail={`Current: ${streakLabel(stats.m1Current)}`} />
+      <RecordRow label={`${club(manager2, "Manager 2")} longest streak`} value={`${stats.m2LongestWins}W`} detail={`Current: ${streakLabel(stats.m2Current)}`} />
     </section>
 
-    <h2>Round champions</h2>
+    <h2>Round race</h2>
+    <section className="card roundRaceCard">
+      <div className="historyGameTop"><span className="eyebrow">Round {roundNo || 1} · GW {roundStart || "—"}–{roundEnd || "—"}</span><span className="pill">{currentRound.games.length}/4 FINAL</span></div>
+      <div className="roundRaceScore">
+        <div><span>{club(manager1, "Manager 1")}</span><b>{currentRound.m1Wins}</b><small>{currentRound.m1Points} pts</small></div>
+        <strong>–</strong>
+        <div><span>{club(manager2, "Manager 2")}</span><b>{currentRound.m2Wins}</b><small>{currentRound.m2Points} pts</small></div>
+      </div>
+      <p className="sub">{currentRound.leader ? club(currentRound.leader, "Leader") + " currently controls the round." : "The current round is level."}</p>
+    </section>
+
+    <h2>Round recaps</h2>
     <section className="card">
       {roundResults.length ? roundResults.map((round) => {
         const winner = round.winner_slot === 1 ? manager1 : round.winner_slot === 2 ? manager2 : undefined;
