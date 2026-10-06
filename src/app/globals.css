@@ -1158,3 +1158,172 @@ h3{letter-spacing:-.18px}
   .fantasyLeagueTableHead,.fantasyLeagueTableRow{grid-template-columns:minmax(84px,1.4fr) repeat(3,35px)}
   .fantasyLeagueTableHead span:nth-child(3),.fantasyLeagueTableHead span:nth-child(5),.fantasyLeagueTableRow span:nth-child(3),.fantasyLeagueTableRow span:nth-child(5){display:none}
 }
+
+
+/* 2026-10 reliability + rivalry storytelling */
+.liveStamp.stale{color:#ffe0a5}
+.liveFeedNotice{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  margin-top:9px;
+  padding:8px 10px;
+  border:1px solid rgba(255,215,106,.18);
+  border-radius:11px;
+  background:rgba(255,196,82,.10);
+  color:#f9e7c0;
+  font-size:10px;
+  line-height:1.35;
+}
+.liveFeedNotice span{
+  flex:0 0 auto;
+  border-radius:999px;
+  padding:3px 5px;
+  background:rgba(255,216,106,.18);
+  color:#fff0be;
+  font-size:7px;
+  font-weight:950;
+  letter-spacing:.55px;
+}
+.rivalryPulse{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 88% 0,rgba(157,174,255,.15),transparent 42%),
+    linear-gradient(145deg,#fffefa,#f4f5ff);
+}
+.rivalryPulse .historyGameTop h2{margin:2px 0 0}
+.rivalryPulseGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:14px;
+}
+.rivalryPulseGrid>div{
+  min-width:0;
+  border:1px solid rgba(115,95,223,.10);
+  border-radius:13px;
+  padding:10px;
+  background:rgba(255,255,255,.66);
+}
+.rivalryPulseGrid span{
+  display:block;
+  font-size:7.5px;
+  font-weight:950;
+  letter-spacing:.65px;
+  color:#6e74a6;
+}
+.rivalryPulseGrid b{
+  display:block;
+  margin:4px 0 2px;
+  font-size:14px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.rivalryPulseGrid small{display:block;color:var(--muted);font-size:9px}
+.milestoneGrid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin:12px 0;
+}
+.milestoneCard{
+  min-width:0;
+  margin:0;
+  padding:13px;
+  background:
+    linear-gradient(145deg,rgba(255,254,250,.98),rgba(244,245,255,.96));
+}
+.milestoneCard>span{
+  display:block;
+  color:#735fdf;
+  font-size:7px;
+  font-weight:950;
+  letter-spacing:.75px;
+}
+.milestoneCard>b{
+  display:block;
+  margin:5px 0 3px;
+  font-size:12px;
+  line-height:1.2;
+}
+.milestoneCard>small{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.35;
+}
+.playerOfWeek{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 100% 0,rgba(255,216,106,.22),transparent 40%),
+    linear-gradient(145deg,#fffefa,#fff8df);
+  border-color:rgba(212,134,34,.18);
+}
+.playerOfWeek .playerAvatar{flex:0 0 auto}
+.playerOfWeek h2{margin:2px 0 0}
+.playerOfWeek .sub{margin:3px 0 0}
+.playerOfWeekBadge{
+  position:absolute;
+  right:11px;
+  top:10px;
+  color:rgba(180,128,34,.18);
+  font-size:42px;
+  line-height:1;
+}
+.playerOfWeekScore{
+  flex:0 0 56px;
+  text-align:center;
+  border:1px solid rgba(212,134,34,.17);
+  border-radius:12px;
+  padding:8px 6px;
+  background:linear-gradient(145deg,#fff1b8,#ffe499);
+}
+.playerOfWeekScore b{display:block;color:#7d5111;font-size:21px;line-height:1}
+.playerOfWeekScore span{display:block;margin-top:3px;color:#936b28;font-size:7px;font-weight:950;letter-spacing:.5px}
+.roundRaceCard{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 100% 0,rgba(157,174,255,.12),transparent 38%),
+    linear-gradient(145deg,#fffefa,#f5f6ff);
+}
+.roundRaceScore{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:12px;
+  align-items:end;
+  margin:16px 0 9px;
+}
+.roundRaceScore>div{display:grid;justify-items:center;gap:2px;text-align:center}
+.roundRaceScore span{max-width:100%;font-size:10px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.roundRaceScore b{font-size:32px;line-height:1}
+.roundRaceScore small{color:var(--muted);font-size:9px}
+.roundRaceScore>strong{padding-bottom:12px;color:#8087ad}
+.roundRaceCard>.sub{text-align:center;margin-bottom:0}
+.roundRecap{align-items:flex-start}
+.roundRecapFacts{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:7px;
+}
+.roundRecapFacts span{
+  border-radius:999px;
+  padding:4px 6px;
+  background:#f0f1f9;
+  color:#626b9a;
+  font-size:8px;
+  font-weight:850;
+}
+@media(max-width:520px){
+  .milestoneGrid{grid-template-columns:1fr}
+  .milestoneCard{padding:12px 13px}
+  .playerOfWeek{gap:9px}
+  .playerOfWeekScore{flex-basis:50px}
+}
