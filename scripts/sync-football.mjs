@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 
 const BASE = "https://fantasy.premierleague.com/api";
+const ALLOW_STALE_ON_FAILURE = process.env.SOCCERTIME_ALLOW_STALE_FPL === "1";
+const RETRY_DELAYS_MS = [0, 400, 1200];
 
 function number(value) {
   const parsed = Number(value || 0);
@@ -34,18 +36,49 @@ function soccerTimeScore(stats = {}, explain = []) {
 }
 
 
-async function api(path) {
-  const response = await fetch(`${BASE}${path}`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-      "accept": "application/json,text/plain,*/*",
-      "accept-language": "en-US,en;q=0.9",
-    },
-  });
-  if (!response.ok) throw new Error(`${path}: ${response.status}`);
-  return response.json();
+function retryable(status) {
+  return status === 403 || status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
+async function wait(ms) {
+  if (ms > 0) await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function api(path) {
+  let lastError;
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt += 1) {
+    await wait(RETRY_DELAYS_MS[attempt]);
+    try {
+      const response = await fetch(`${BASE}${path}`, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+          "accept": "application/json,text/plain,*/*",
+          "accept-language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) {
+        const error = new Error(`${path}: ${response.status}`);
+        lastError = error;
+        if (attempt + 1 < RETRY_DELAYS_MS.length && retryable(response.status)) {
+          console.warn(`FPL retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${path} after HTTP ${response.status}`);
+          continue;
+        }
+        throw error;
+      }
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < RETRY_DELAYS_MS.length) {
+        console.warn(`FPL retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${path} after network failure`);
+        continue;
+      }
+    }
+  }
+  throw lastError || new Error(`${path}: FPL request failed`);
+}
+
+async function sync() {
 const bootstrap = await api("/bootstrap-static/");
 const rawFixtures = await api("/fixtures/");
 const teams = new Map(bootstrap.teams.map((team) => [team.id, team]));
@@ -150,3 +183,23 @@ const output = {
 await fs.mkdir("public/data", { recursive: true });
 await fs.writeFile("public/data/epl.json", JSON.stringify(output));
 console.log(`Synced ${players.length} players, ${fixtures.length} fixtures, through GW${currentEvent}`);
+}
+
+try {
+  await sync();
+} catch (error) {
+  if (!ALLOW_STALE_ON_FAILURE) throw error;
+
+  try {
+    const existing = JSON.parse(await fs.readFile("public/data/epl.json", "utf8"));
+    if (!Array.isArray(existing?.players) || !existing.players.length || !Array.isArray(existing?.fixtures) || !existing.fixtures.length) {
+      throw new Error("Existing SoccerTime feed is not usable");
+    }
+    console.warn(
+      `FPL sync failed; keeping last-known-good public/data/epl.json from ${existing.updatedAt || "unknown time"}. ${error instanceof Error ? error.message : error}`,
+    );
+  } catch (staleError) {
+    console.error("FPL sync failed and no usable last-known-good static feed exists", staleError);
+    throw error;
+  }
+}
