@@ -168,6 +168,8 @@ export default function HistoryClient() {
   const manager1 = state?.managers?.find((manager) => Number(manager.slot) === 1);
   const manager2 = state?.managers?.find((manager) => Number(manager.slot) === 2);
   const activeGameweek = number(state?.league?.active_gameweek);
+  const roundNo = number(state?.draft?.round_no);
+  const roundStart = number(state?.draft?.start_gameweek);
   const roundEnd = number(state?.draft?.end_gameweek);
 
   const completed = useMemo(
@@ -188,6 +190,9 @@ export default function HistoryClient() {
     const highest = teamGames.length
       ? [...teamGames].sort((a, b) => b.score - a.score || b.gameweek - a.gameweek)[0]
       : null;
+    const lowest = teamGames.length
+      ? [...teamGames].sort((a, b) => a.score - b.score || b.gameweek - a.gameweek)[0]
+      : null;
     const biggest = completed.length
       ? [...completed].sort((a, b) => Math.abs(number(b.manager1_score) - number(b.manager2_score)) - Math.abs(number(a.manager1_score) - number(a.manager2_score)))[0]
       : null;
@@ -197,13 +202,99 @@ export default function HistoryClient() {
     const combined = completed.length
       ? [...completed].sort((a, b) => (number(b.manager1_score) + number(b.manager2_score)) - (number(a.manager1_score) + number(a.manager2_score)))[0]
       : null;
-    return { m1Wins, m2Wins, draws, highest, biggest, closest, combined };
+    return {
+      m1Wins,
+      m2Wins,
+      draws,
+      highest,
+      lowest,
+      biggest,
+      closest,
+      combined,
+      m1Current: currentStreak(completed, 1),
+      m2Current: currentStreak(completed, 2),
+      m1LongestWins: longestWinStreak(completed, 1),
+      m2LongestWins: longestWinStreak(completed, 2),
+    };
   }, [completed]);
 
   const roundResults = useMemo(
     () => [...(state?.round_results || [])].sort((a, b) => Number(b.round_no) - Number(a.round_no)),
     [state?.round_results],
   );
+
+  const currentRound = useMemo(() => {
+    const games = completed.filter((game) => Number(game.gameweek) >= roundStart && Number(game.gameweek) <= roundEnd);
+    const m1Wins = games.filter((game) => number(game.manager1_score) > number(game.manager2_score)).length;
+    const m2Wins = games.filter((game) => number(game.manager2_score) > number(game.manager1_score)).length;
+    const m1Points = games.reduce((sum, game) => sum + number(game.manager1_score), 0);
+    const m2Points = games.reduce((sum, game) => sum + number(game.manager2_score), 0);
+    const leader = m1Wins === m2Wins
+      ? (m1Points === m2Points ? null : m1Points > m2Points ? manager1 : manager2)
+      : m1Wins > m2Wins ? manager1 : manager2;
+    return { games, m1Wins, m2Wins, m1Points, m2Points, leader };
+  }, [completed, manager1, manager2, roundEnd, roundStart]);
+
+  const playerOfWeek = useMemo(() => {
+    const latest = completed[0];
+    if (!latest) return null;
+    const scores = staticData.scores?.[String(latest.gameweek)];
+    if (!scores) return null;
+    const entries = Object.entries(scores)
+      .map(([id, score]) => ({ id: Number(id), score: Number(score) }))
+      .filter((entry) => Number.isFinite(entry.id) && Number.isFinite(entry.score))
+      .sort((a, b) => b.score - a.score || a.id - b.id);
+    const leader = entries[0];
+    if (!leader) return null;
+    const player = staticData.players?.find((item) => Number(item.id) === leader.id);
+    if (!player) return null;
+    const tied = entries.filter((entry) => entry.score === leader.score).length;
+    return { ...player, score: leader.score, gameweek: Number(latest.gameweek), tied };
+  }, [completed, staticData.players, staticData.scores]);
+
+  const milestones = useMemo(() => {
+    const latest = completed[0];
+    if (!latest) return [] as Array<{ kicker: string; title: string; detail: string }>;
+    const score1 = number(latest.manager1_score);
+    const score2 = number(latest.manager2_score);
+    const margin = Math.abs(score1 - score2);
+    const highScore = Math.max(score1, score2);
+    const cards: Array<{ kicker: string; title: string; detail: string }> = [];
+
+    if (stats.highest && Number(stats.highest.gameweek) === Number(latest.gameweek) && stats.highest.score === highScore) {
+      cards.push({
+        kicker: "NEW RECORD",
+        title: "Season-high score",
+        detail: String(stats.highest.score) + " points by " + (stats.highest.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2")),
+      });
+    }
+    if (stats.biggest && Number(stats.biggest.gameweek) === Number(latest.gameweek) && margin > 0) {
+      cards.push({
+        kicker: "RIVALRY MARK",
+        title: "Biggest win so far",
+        detail: String(margin) + "-point margin · " + winnerForGame(latest, manager1, manager2),
+      });
+    } else if (stats.closest && Number(stats.closest.gameweek) === Number(latest.gameweek)) {
+      cards.push({
+        kicker: "PHOTO FINISH",
+        title: "Closest derby so far",
+        detail: String(margin) + "-point margin in GW " + String(latest.gameweek),
+      });
+    }
+
+    const winnerSlot: 1 | 2 | null = score1 === score2 ? null : score1 > score2 ? 1 : 2;
+    const current = winnerSlot === 1 ? stats.m1Current : winnerSlot === 2 ? stats.m2Current : null;
+    const winner = winnerSlot === 1 ? manager1 : winnerSlot === 2 ? manager2 : undefined;
+    if (current?.kind === "W" && current.count >= 2) {
+      cards.push({
+        kicker: "HEAT CHECK",
+        title: String(current.count) + " straight for " + club(winner, "Leader"),
+        detail: "Longest win streak: " + String(winnerSlot === 1 ? stats.m1LongestWins : stats.m2LongestWins),
+      });
+    }
+
+    return cards.slice(0, 3);
+  }, [completed, manager1, manager2, stats]);
 
   if (loading) {
     return <><main className="shell historyShell theme-history"><HistoryHeader /><section className="card"><div className="eyebrow">Rivalry archive</div><HistorySkeleton /></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
