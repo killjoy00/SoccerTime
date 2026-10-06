@@ -124,6 +124,7 @@ function winnerForGame(game: Matchup, manager1?: Manager, manager2?: Manager) {
 
 export default function HistoryClient() {
   const [state, setState] = useState<LeagueState | null>(null);
+  const [staticData, setStaticData] = useState<StaticData>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -139,10 +140,17 @@ export default function HistoryClient() {
         return;
       }
       try {
-        const result = await rpc("league_state", { p_code: code });
+        const [result, feed] = await Promise.all([
+          rpc("league_state", { p_code: code }),
+          fetch("/data/epl.json", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).catch(() => null),
+        ]);
         if (!active) return;
         if (!result?.ok) setError(result?.error || "Could not load league history.");
-        else setState(result);
+        else {
+          setState(result);
+          setError("");
+        }
+        if (feed) setStaticData(feed);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Could not load league history.");
       } finally {
