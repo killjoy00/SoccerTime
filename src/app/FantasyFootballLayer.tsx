@@ -130,6 +130,9 @@ export function FantasyMatchupCenter({
   catalog,
   fixtures,
   matchups,
+  roundNo,
+  roundStart,
+  roundEnd,
   moves,
   scoreFor,
   deadline,
@@ -146,6 +149,9 @@ export function FantasyMatchupCenter({
   catalog: Map<number, Player>;
   fixtures: Fixture[];
   matchups: any[];
+  roundNo: number;
+  roundStart: number;
+  roundEnd: number;
   moves: any[];
   scoreFor: (pick: any) => number;
   deadline: string;
@@ -167,6 +173,32 @@ export function FantasyMatchupCenter({
   const theirSorted = sortedPicks(theirs);
   const rows = Math.max(mySorted.length, theirSorted.length);
   const weeks = [...matchups].sort((a, b) => Number(a.gameweek) - Number(b.gameweek));
+  const finals = matchups.filter((matchup) => matchup.status === "final");
+  const resultForMe = (matchup: any) => {
+    const myScore = Number(me?.slot === 1 ? matchup.manager1_score : matchup.manager2_score);
+    const theirScore = Number(me?.slot === 1 ? matchup.manager2_score : matchup.manager1_score);
+    return myScore === theirScore ? "D" : myScore > theirScore ? "W" : "L";
+  };
+  const mySeasonWins = finals.filter((matchup) => resultForMe(matchup) === "W").length;
+  const theirSeasonWins = finals.filter((matchup) => resultForMe(matchup) === "L").length;
+  const seasonDraws = finals.length - mySeasonWins - theirSeasonWins;
+  const recentFinals = [...finals].sort((a, b) => Number(b.gameweek) - Number(a.gameweek));
+  const latestResult = recentFinals[0] ? resultForMe(recentFinals[0]) : null;
+  let streakCount = 0;
+  for (const matchup of recentFinals) {
+    if (resultForMe(matchup) !== latestResult) break;
+    streakCount += 1;
+  }
+  const roundFinals = finals.filter((matchup) => {
+    const week = Number(matchup.gameweek);
+    return week >= roundStart && week <= roundEnd;
+  });
+  const myRoundWins = roundFinals.filter((matchup) => resultForMe(matchup) === "W").length;
+  const theirRoundWins = roundFinals.filter((matchup) => resultForMe(matchup) === "L").length;
+  const myRoundPoints = roundFinals.reduce((sum, matchup) => sum + Number(me?.slot === 1 ? matchup.manager1_score : matchup.manager2_score), 0);
+  const theirRoundPoints = roundFinals.reduce((sum, matchup) => sum + Number(me?.slot === 1 ? matchup.manager2_score : matchup.manager1_score), 0);
+  const streakClub = latestResult === "W" ? (me?.club_name || "You") : latestResult === "L" ? (opponent?.club_name || "Opponent") : "Draws";
+  const streakText = latestResult ? `${latestResult === "D" ? "D" : "W"}${streakCount}` : "—";
 
   return <>
     <section className="card fantasyPanel">
@@ -223,6 +255,33 @@ export function FantasyMatchupCenter({
         </div>;
       })}
     </section>}
+
+    <section className="card matchupRivalryPulse">
+      <div className="fantasyPanelHead matchupRivalryHead">
+        <div>
+          <div className="eyebrow">Rivalry pulse</div>
+          <h3>The season behind this matchup</h3>
+        </div>
+        <a className="matchupRivalryLink" href="/history">Full archive →</a>
+      </div>
+      <div className="matchupRivalryGrid">
+        <div>
+          <span>SEASON SERIES</span>
+          <b>{mySeasonWins}–{seasonDraws}–{theirSeasonWins}</b>
+          <small>{mySeasonWins === theirSeasonWins ? "Series level" : mySeasonWins > theirSeasonWins ? `${me?.club_name || "You"} ahead` : `${opponent?.club_name || "Opponent"} ahead`}</small>
+        </div>
+        <div>
+          <span>CURRENT STREAK</span>
+          <b>{streakText}</b>
+          <small>{latestResult ? streakClub : "No finals yet"}</small>
+        </div>
+        <div>
+          <span>ROUND {roundNo}</span>
+          <b>{myRoundWins}–{theirRoundWins}</b>
+          <small>{myRoundPoints}–{theirRoundPoints} SoccerTime pts</small>
+        </div>
+      </div>
+    </section>
 
     <section className="card fantasyPanel">
       <div className="fantasyPanelHead">
