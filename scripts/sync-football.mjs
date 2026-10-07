@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import { fplApi as api } from "./fpl-http.mjs";
+import { STATIC_SCORING_VERSION, reusableFinalScores } from "./static-feed-cache.mjs";
 
 function number(value) {
   const parsed = Number(value || 0);
@@ -33,6 +34,11 @@ function soccerTimeScore(stats = {}, explain = []) {
 }
 
 
+let previousFeed = null;
+try {
+  previousFeed = JSON.parse(await fs.readFile("public/data/epl.json", "utf8"));
+} catch {}
+
 const bootstrap = await api("/bootstrap-static/");
 const rawFixtures = await api("/fixtures/");
 const teams = new Map(bootstrap.teams.map((team) => [team.id, team]));
@@ -64,11 +70,22 @@ const playableEvents = bootstrap.events
   .filter((event) => event.finished || event.is_current)
   .map((event) => event.id);
 const scores = {};
+let reusedScoreEvents = 0;
+let fetchedScoreEvents = 0;
+const eventById = new Map(bootstrap.events.map((event) => [event.id, event]));
 for (const eventId of playableEvents) {
+  const event = eventById.get(eventId);
+  const reusable = reusableFinalScores(previousFeed, event);
+  if (reusable) {
+    scores[String(eventId)] = reusable;
+    reusedScoreEvents += 1;
+    continue;
+  }
   const live = await api(`/event/${eventId}/live/`);
   scores[String(eventId)] = Object.fromEntries(
     live.elements.map((element) => [String(element.id), soccerTimeScore(element.stats, element.explain)]),
   );
+  fetchedScoreEvents += 1;
 }
 
 const players = bootstrap.elements.map((player) => {
@@ -125,6 +142,7 @@ const fixtures = rawFixtures.map((fixture) => ({
 
 const output = {
   provider: "official-fpl-public-api",
+  scoringVersion: STATIC_SCORING_VERSION,
   updatedAt: new Date().toISOString(),
   currentEvent,
   events,
@@ -136,4 +154,4 @@ const output = {
 
 await fs.mkdir("public/data", { recursive: true });
 await fs.writeFile("public/data/epl.json", JSON.stringify(output));
-console.log(`Synced ${players.length} players, ${fixtures.length} fixtures, through GW${currentEvent}`);
+console.log(`Synced ${players.length} players, ${fixtures.length} fixtures, through GW${currentEvent}; reused ${reusedScoreEvents} finalized score set(s), fetched ${fetchedScoreEvents}`);
