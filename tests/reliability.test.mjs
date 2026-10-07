@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createFplFetcher, FplUpstreamError } from "../src/lib/fpl-server.ts";
 import { createSoccerTimeRpc } from "../src/lib/neon-server.ts";
 import { createFplApi } from "../scripts/fpl-http.mjs";
-import { STATIC_SCORING_VERSION, reusableFinalScores } from "../scripts/static-feed-cache.mjs";
+import { STATIC_SCORING_VERSION, reusableFinalScores, sameFeedContent } from "../scripts/static-feed-cache.mjs";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -249,4 +249,38 @@ test("static feed never reuses current or unfinished Gameweek scores", () => {
     reusableFinalScores(previous, { id: 6, finished: false, data_checked: false, is_current: true }),
     null,
   );
+});
+
+
+test("static feed treats updatedAt-only changes as no-op", () => {
+  const previous = {
+    provider: "official-fpl-public-api",
+    scoringVersion: STATIC_SCORING_VERSION,
+    updatedAt: "2026-10-07T00:00:00.000Z",
+    currentEvent: 5,
+    players: [{ id: 1, name: "Player" }],
+    scores: { "5": { "1": 7 } },
+  };
+  const next = {
+    ...previous,
+    updatedAt: "2026-10-07T03:00:00.000Z",
+  };
+
+  assert.equal(sameFeedContent(previous, next), true);
+});
+
+test("static feed detects meaningful football data changes", () => {
+  const previous = {
+    provider: "official-fpl-public-api",
+    scoringVersion: STATIC_SCORING_VERSION,
+    updatedAt: "2026-10-07T00:00:00.000Z",
+    players: [{ id: 1, status: "a" }],
+  };
+  const next = {
+    ...previous,
+    updatedAt: "2026-10-07T03:00:00.000Z",
+    players: [{ id: 1, status: "d" }],
+  };
+
+  assert.equal(sameFeedContent(previous, next), false);
 });
