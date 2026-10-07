@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { fplApi as api } from "./fpl-http.mjs";
-import { STATIC_SCORING_VERSION, reusableFinalScores } from "./static-feed-cache.mjs";
+import { STATIC_SCORING_VERSION, reusableFinalScores, sameFeedContent } from "./static-feed-cache.mjs";
 
 function number(value) {
   const parsed = Number(value || 0);
@@ -153,5 +153,9 @@ const output = {
 };
 
 await fs.mkdir("public/data", { recursive: true });
-await fs.writeFile("public/data/epl.json", JSON.stringify(output));
-console.log(`Synced ${players.length} players, ${fixtures.length} fixtures, through GW${currentEvent}; reused ${reusedScoreEvents} finalized score set(s), fetched ${fetchedScoreEvents}`);
+if (sameFeedContent(previousFeed, output)) {
+  console.log(`No meaningful Premier League data change; reused ${reusedScoreEvents} finalized score set(s), fetched ${fetchedScoreEvents}`);
+} else {
+  await fs.writeFile("public/data/epl.json", JSON.stringify(output));
+  console.log(`Synced ${players.length} players, ${fixtures.length} fixtures, through GW${currentEvent}; reused ${reusedScoreEvents} finalized score set(s), fetched ${fetchedScoreEvents}`);
+}
