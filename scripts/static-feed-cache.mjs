@@ -6,3 +6,19 @@ export function reusableFinalScores(previousFeed, event) {
   const scores = previousFeed.scores?.[String(event.id)];
   return scores && typeof scores === "object" ? scores : null;
 }
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .filter((key) => key !== "updatedAt")
+      .sort()
+      .map((key) => [key, canonical(value[key])]),
+  );
+}
+
+export function sameFeedContent(previousFeed, nextFeed) {
+  if (!previousFeed || !nextFeed) return false;
+  return JSON.stringify(canonical(previousFeed)) === JSON.stringify(canonical(nextFeed));
+}
