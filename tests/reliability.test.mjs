@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createFplFetcher, FplUpstreamError } from "../src/lib/fpl-server.ts";
 import { createSoccerTimeRpc } from "../src/lib/neon-server.ts";
 import { createFplApi } from "../scripts/fpl-http.mjs";
+import { STATIC_SCORING_VERSION, reusableFinalScores } from "../scripts/static-feed-cache.mjs";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -214,4 +215,38 @@ test("static FPL sync does not waste retries on a real 404", async () => {
 
   await assert.rejects(() => api("/missing/"), /404/);
   assert.equal(calls, 1);
+});
+
+
+test("static feed reuses finalized data-checked scores only for the same scoring version", () => {
+  const scores = { "101": 7 };
+  const previous = {
+    scoringVersion: STATIC_SCORING_VERSION,
+    scores: { "5": scores },
+  };
+
+  assert.equal(
+    reusableFinalScores(previous, { id: 5, finished: true, data_checked: true }),
+    scores,
+  );
+  assert.equal(
+    reusableFinalScores(previous, { id: 5, finished: true, data_checked: false }),
+    null,
+  );
+  assert.equal(
+    reusableFinalScores({ ...previous, scoringVersion: "older-rules" }, { id: 5, finished: true, data_checked: true }),
+    null,
+  );
+});
+
+test("static feed never reuses current or unfinished Gameweek scores", () => {
+  const previous = {
+    scoringVersion: STATIC_SCORING_VERSION,
+    scores: { "6": { "101": 4 } },
+  };
+
+  assert.equal(
+    reusableFinalScores(previous, { id: 6, finished: false, data_checked: false, is_current: true }),
+    null,
+  );
 });
