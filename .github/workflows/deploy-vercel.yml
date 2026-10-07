@@ -115,3 +115,6 @@ jobs:
           done
           echo "::error::Production health check failed after deployment."
           exit 1
+
+      - name: Verify live mobile layouts
+        run: node scripts/mobile-smoke.mjs https://soccertime.planitnow.us
