@@ -1427,3 +1427,119 @@ h3{letter-spacing:-.18px}
   .matchupRivalryGrid{grid-template-columns:1fr 1fr}
   .matchupRivalryGrid>div:last-child{grid-column:1/-1}
 }
+
+
+/* 2026-10 Historical match recaps and free-agent-first roster swaps */
+.historyGameLink,.fantasyWeekLink,.fantasyScheduleLink{
+  text-decoration:none;
+  color:inherit;
+  cursor:pointer;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.historyGameLink:hover,.fantasyScheduleLink:hover,.fantasyWeekLink:hover{
+  transform:translateY(-2px);
+  border-color:rgba(115,95,223,.3);
+  box-shadow:0 10px 24px rgba(32,41,94,.11);
+}
+.historyGameLink:focus-visible,.fantasyScheduleLink:focus-visible,.fantasyWeekLink:focus-visible,
+.fantasyAddButton:focus-visible,.swapDropOption:focus-within{
+  outline:3px solid rgba(115,95,223,.44);
+  outline-offset:3px;
+}
+.historyViewRecap{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:9px;color:#5d55ab;font-size:11px;font-weight:900}
+.historyViewRecap span,.fantasyScheduleChevron{font-size:20px;line-height:1}
+.fantasyScheduleChevron{color:#735fdf;font-weight:900;flex:0 0 auto}
+.historyRecapBack{display:inline-flex;align-items:center;color:#564d96;font-size:12px;font-weight:900;text-decoration:none;margin:1px 0 12px}
+.historyRecapBack:focus-visible{outline:3px solid #9386ea;outline-offset:4px}
+.historyRecapHero{
+  overflow:hidden;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.17);
+  background:radial-gradient(circle at 90% 4%,rgba(167,150,255,.34),transparent 40%),
+    linear-gradient(135deg,#172153,#293a8c 55%,#564ca1);
+  box-shadow:0 16px 42px rgba(32,41,94,.2);
+}
+.historyRecapTop{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#d8ddff;font-size:9px;font-weight:950;letter-spacing:1px}
+.historyRecapFinal{background:rgba(166,255,205,.17);border:1px solid rgba(166,255,205,.26);border-radius:99px;padding:6px 10px;color:#bfffdf}
+.historyRecapScoreboard{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center;margin:26px 0 19px}
+.historyRecapClub{min-width:0;display:flex;flex-direction:column;gap:4px;text-align:center}
+.historyRecapClub strong{font-size:14px;line-height:1.15;overflow-wrap:anywhere}
+.historyRecapClub span{color:#d5dafa;font-size:10px}
+.historyRecapBigScore{display:flex;align-items:center;gap:11px;font-size:40px;line-height:1;font-weight:950;letter-spacing:-2px}
+.historyRecapBigScore span{font-size:22px;color:#b3c0ef;font-weight:500}
+.historyRecapResult{text-align:center;color:#ecedff;font-size:13px;font-weight:850;margin:0}
+.historyRecapStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 22px}
+.historyRecapStats>div{min-width:0;display:grid;justify-items:center;border:1px solid rgba(115,95,223,.13);border-radius:14px;padding:10px 7px;background:#fffefa}
+.historyRecapStats span{color:#716d92;font-size:7.5px;letter-spacing:.5px;font-weight:950;text-align:center}
+.historyRecapStats b{font-size:18px;margin:5px 0 2px}
+.historyRecapStats small{font-size:9px;color:var(--muted);text-align:center}
+.historyRecapHeading{margin:18px 0 10px}
+.historyRecapTeams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.historyRecapTeam{min-width:0}
+.historyRecapTeamHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.historyRecapTeamHeader>div{min-width:0}
+.historyRecapTeamHeader span{font-size:8px;color:#777aa0;font-weight:950;letter-spacing:.6px}
+.historyRecapTeamHeader h3{margin:3px 0 0;font-size:16px;overflow-wrap:anywhere}
+.historyRecapTeamPoints{display:grid;place-items:center;min-width:58px;border-radius:12px;background:#e7e5fa;padding:8px}
+.historyRecapTeamPoints b{font-size:21px;line-height:1;color:#382d7e}
+.historyRecapRoster{border-top:1px solid rgba(115,95,223,.1)}
+.historyRecapPlayer{display:flex;align-items:center;gap:7px;border-bottom:1px solid rgba(115,95,223,.08);padding:9px 0}
+.historyRecapPlayer .playerAvatar{width:38px;height:38px;flex:0 0 38px}
+.historyRecapPlayerName{min-width:0;flex:1}
+.historyRecapPlayerName strong,.historyRecapPlayerName span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.historyRecapPlayerName strong{font-size:11px}
+.historyRecapPlayerName span{font-size:8px;color:var(--muted);margin-top:2px}
+.historyRecapCaptain{flex:0 0 auto;padding:4px 5px;background:#f8ebad;border-radius:99px;color:#644c10;font-size:8px;font-weight:950}
+.historyRecapPlayerScore{flex:0 0 auto;display:grid;text-align:center;min-width:30px}
+.historyRecapPlayerScore b{font-size:16px}
+.historyRecapPlayerScore small{font-size:7px;color:var(--muted)}
+.historyRecapBonus{justify-content:space-between;color:#5d55ab;font-size:10px;font-weight:800}
+.historyRecapRosterTotal{display:flex;justify-content:space-between;align-items:center;padding:12px 0 2px;font-size:12px;font-weight:950}
+.historyRecapRosterTotal b{font-size:22px}
+.historyRecapUnavailable{background:#f4f3fb;border:1px solid rgba(115,95,223,.12);border-radius:13px;padding:12px}
+.historyRecapUnavailable strong{font-size:12px}
+.historyRecapUnavailable p{font-size:11px;line-height:1.5;color:#5d6472;margin:7px 0 0}
+.historyRecapSource{font-size:10px;line-height:1.5;color:var(--muted);margin:12px 3px}
+.fantasyAddButton{min-height:34px!important;min-width:45px;padding:7px 9px!important;flex:0 0 auto;font-size:11px;font-weight:950}
+.swapBackdrop{z-index:60;align-items:center;overflow-y:auto;padding:14px}
+.swapModal{max-height:calc(100dvh - 28px);overflow-y:auto;outline:none}
+.swapModal h2{font-size:23px;margin:6px 0 11px;line-height:1.2}
+.swapModal h3{font-size:15px;margin:16px 0 4px}
+.swapIncoming{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;border:1px solid rgba(79,241,218,.28);background:linear-gradient(135deg,#e9fcf7,#f1f4ff)}
+.swapIncoming .playerAvatar{flex:0 0 48px}
+.swapIncoming strong,.swapIncoming span{display:block}
+.swapIncoming strong{font-size:14px}
+.swapIncoming .grow span{font-size:10px;color:var(--muted);margin-top:3px}
+.swapIncomingTag{flex:0 0 auto;color:#0a694b;background:#c5f3df;border-radius:99px;padding:4px 7px;font-size:9px;font-weight:950}
+.swapModalIntro{margin:0 0 12px;font-size:11px}
+.swapDropList{display:grid;gap:7px;max-height:min(34dvh,240px);overflow-y:auto;padding:3px}
+.swapDropOption{position:relative;display:flex;align-items:center;gap:10px;border:1px solid rgba(16,32,24,.13);border-radius:12px;padding:11px 12px;cursor:pointer;background:#fffefa}
+.swapDropOption.chosen{border-color:#62bd9c;background:#edfaf3;box-shadow:0 0 0 2px rgba(98,189,156,.08)}
+.swapDropOption input{position:absolute;opacity:0;width:1px;height:1px}
+.swapDropRadio{width:18px;height:18px;flex:0 0 18px;border-radius:50%;border:2px solid #a9bcb0}
+.swapDropOption.chosen .swapDropRadio{border:5px solid #1b9f66}
+.swapDropName{min-width:0;flex:1}
+.swapDropName strong,.swapDropName small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swapDropName strong{font-size:13px}.swapDropName small{font-size:10px;color:var(--muted)}
+.swapDropTag{font-size:9px!important;font-weight:950;color:#a24d47!important;background:#fff0ed;padding:5px 7px;border-radius:99px}
+.swapCaptainAlert{background:#fff7de;border-color:#efd69e;color:#835b0f}
+.swapConfirmCopy{font-size:11px;color:#4a5d52;padding:11px 2px;margin:0}
+.swapModalActions{margin-top:10px}
+@media(max-width:600px){
+  .historyRecapTeams{grid-template-columns:minmax(0,1fr)}
+  .swapBackdrop{align-items:flex-end;padding:8px}
+  .swapModal{max-height:calc(100dvh - 16px);border-radius:22px 22px 12px 12px}
+}
+@media(max-width:430px){
+  .fantasyMarketRow{gap:5px}
+  .fantasyMarketRow .playerAvatar{width:38px;height:38px;flex-basis:38px}
+  .fantasyMarketStats{grid-template-columns:36px!important;gap:0}
+  .fantasyMarketStats>div:nth-child(n+2){display:none}
+  .fantasyWatch{flex-basis:22px;width:22px}
+  .fantasyAddButton{min-width:42px;padding:7px!important}
+  .historyRecapBigScore{font-size:32px;gap:6px}
+  .historyRecapClub strong{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .historyGameLink,.fantasyWeekLink,.fantasyScheduleLink{transition:none}
+}
