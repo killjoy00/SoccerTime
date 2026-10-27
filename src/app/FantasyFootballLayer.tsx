@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PlayerFace from "./PlayerFace";
 
 type Player = {
@@ -248,11 +249,15 @@ export function FantasyMatchupCenter({
         const theirScore = Number(theirRaw);
         const hasScore = myRaw != null && theirRaw != null && Number.isFinite(mineScore) && Number.isFinite(theirScore);
         const result = matchup.status === "final" && hasScore ? (mineScore === theirScore ? "D" : mineScore > theirScore ? "W" : "L") : null;
-        return <div className={`fantasyWeekPill ${isCurrent ? "current" : ""}`} key={week}>
+        const contents = <>
           <span>GW {week}</span>
           <b>{result || (isCurrent ? "LIVE" : "—")}</b>
           {hasScore && <small>{mineScore}–{theirScore}</small>}
-        </div>;
+        </>;
+        const rowClass = `fantasyWeekPill ${isCurrent ? "current" : ""}`;
+        return result
+          ? <Link className={`${rowClass} fantasyWeekLink`} href={`/history?gw=${week}`} key={week} aria-label={`View Gameweek ${week} recap`}>{contents}</Link>
+          : <div className={rowClass} key={week}>{contents}</div>;
       })}
     </section>}
 
@@ -392,11 +397,15 @@ export function FantasyPlayerMarket({
   picks,
   managers,
   onOpen,
+  onPickup,
+  pickupBusy,
 }: {
   players: Player[];
   picks: any[];
   managers: any[];
   onOpen: (player: Player) => void;
+  onPickup: (player: Player) => void;
+  pickupBusy: boolean;
 }) {
   const [mode, setMode] = useState<"available" | "trending" | "watchlist">("available");
   const [watchlist, setWatchlist] = useState<number[]>([]);
@@ -465,6 +474,7 @@ export function FantasyPlayerMarket({
             <div><b>{Number(player.form || 0).toFixed(1)}</b><span>FORM</span></div>
             <div className={trend >= 0 ? "trendUp" : "trendDown"}><b>{trend >= 0 ? "+" : ""}{trend.toFixed(1)}</b><span>TREND</span></div>
           </div>
+          {!ownerId && <button type="button" className="btn fantasyAddButton" disabled={pickupBusy} onClick={() => onPickup(player)} aria-label={`Add ${player.name} from free agency`}>Add</button>}
         </div>;
       }) : <div className="emptyState"><div className="emptyIcon">☆</div><b>Your watchlist is empty</b><span>Tap the star beside any player to keep an eye on them from this device.</span></div>}
     </div>
@@ -564,14 +574,18 @@ export function FantasyLeagueCenter({
           const s1 = Number(matchup.manager1_score);
           const s2 = Number(matchup.manager2_score);
           const hasScores = matchup.manager1_score != null && matchup.manager2_score != null && Number.isFinite(s1) && Number.isFinite(s2);
-          return <div className={`fantasyScheduleRow ${Number(matchup.gameweek) === gw ? "current" : ""}`} key={matchup.gameweek}>
+          const content = <>
             <div className="fantasyGameweekBadge">GW <b>{matchup.gameweek}</b></div>
             <div className="fantasyScheduleTeams">
               <span><strong>{m1?.club_name || "Manager 1"}</strong>{hasScores && <b>{s1}</b>}</span>
               <span><strong>{m2?.club_name || "Manager 2"}</strong>{hasScores && <b>{s2}</b>}</span>
             </div>
             <span className={`fantasyStateTag ${matchup.status === "final" ? "final" : Number(matchup.gameweek) === gw ? "live" : ""}`}>{matchup.status === "final" ? "FINAL" : Number(matchup.gameweek) === gw ? "CURRENT" : "SCHEDULED"}</span>
-          </div>;
+          </>;
+          const rowClass = `fantasyScheduleRow ${Number(matchup.gameweek) === gw ? "current" : ""}`;
+          return matchup.status === "final"
+            ? <Link className={`${rowClass} fantasyScheduleLink`} href={`/history?gw=${matchup.gameweek}`} key={matchup.gameweek} aria-label={`View Gameweek ${matchup.gameweek} full recap`}>{content}<span className="fantasyScheduleChevron" aria-hidden="true">›</span></Link>
+            : <div className={rowClass} key={matchup.gameweek}>{content}</div>;
         })}
       </div>
     </section>

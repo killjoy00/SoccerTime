@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import BottomNav from "../BottomNav";
 import PlayerFace from "../PlayerFace";
+import HistoryRecap from "./HistoryRecap";
 import { rpc } from "@/lib/neon";
+import { buildHistoricalLineups, type ArchivedMove, type ArchivedPick, type HistoricalLineups } from "@/lib/historical-lineups";
 
 type Manager = {
   id: string;
@@ -42,6 +44,7 @@ type LeagueState = {
   draft?: { round_no?: number; start_gameweek?: number; end_gameweek?: number; status?: string };
   managers?: Manager[];
   matchups?: Matchup[];
+  picks?: ArchivedPick[];
   round_results?: RoundResult[];
 };
 
@@ -125,8 +128,16 @@ function winnerForGame(game: Matchup, manager1?: Manager, manager2?: Manager) {
 export default function HistoryClient() {
   const [state, setState] = useState<LeagueState | null>(null);
   const [staticData, setStaticData] = useState<StaticData>({});
+  const [moves, setMoves] = useState<ArchivedMove[] | null>(null);
+  const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("gw");
+    const gw = raw ? Number(raw) : null;
+    if (gw !== null && Number.isInteger(gw) && gw >= 1 && gw <= 38) setSelectedGameweek(gw);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -140,9 +151,10 @@ export default function HistoryClient() {
         return;
       }
       try {
-        const [result, feed] = await Promise.all([
+        const [result, feed, moveResult] = await Promise.all([
           rpc("league_state", { p_code: code }),
           fetch("/data/epl.json", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).catch(() => null),
+          fetch(`/api/moves?code=${encodeURIComponent(code)}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null).catch(() => null),
         ]);
         if (!active) return;
         if (!result?.ok) setError(result?.error || "Could not load league history.");
@@ -151,6 +163,7 @@ export default function HistoryClient() {
           setError("");
         }
         if (feed) setStaticData(feed);
+        setMoves(moveResult?.ok && Array.isArray(moveResult.moves) ? moveResult.moves : null);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Could not load league history.");
       } finally {
@@ -304,6 +317,27 @@ export default function HistoryClient() {
     return <><main className="shell historyShell theme-history"><HistoryHeader /><section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">▥</div><b>History is not ready yet</b><span>{error || state?.error || "History unavailable."}</span></div><Link className="btn historyHomeBtn" href="/">Back to SoccerTime</Link></section></main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;
   }
 
+  if (selectedGameweek !== null) {
+    const match = completed.find((item) => Number(item.gameweek) === selectedGameweek);
+    const breakdown = match ? buildHistoricalLineups({
+      gameweek: selectedGameweek,
+      activeGameweek,
+      roundStart,
+      matchup: match,
+      managers: state.managers || [],
+      currentPicks: state.picks || [],
+      moves,
+      scores: staticData.scores?.[String(selectedGameweek)],
+      playerCatalog: staticData.players,
+    }) : null;
+    return <><main className="shell historyShell theme-history">
+      <HistoryHeader />
+      {match
+        ? <HistoryRecap game={match} managers={state.managers || []} lineups={breakdown} pastGames={completed} />
+        : <section className="card"><h2>Gameweek {selectedGameweek} is not final</h2><p className="sub">A full recap appears after the result is finalized.</p><Link href="/history" className="btn historyHomeBtn">All results</Link></section>}
+    </main><BottomNav active="history" draftOpen={state.draft?.status === "open"} /></>;
+  }
+
   const biggestMargin = stats.biggest ? Math.abs(number(stats.biggest.manager1_score) - number(stats.biggest.manager2_score)) : 0;
   const closestMargin = stats.closest ? Math.abs(number(stats.closest.manager1_score) - number(stats.closest.manager2_score)) : 0;
   const highestClub = stats.highest?.slot === 1 ? club(manager1, "Manager 1") : club(manager2, "Manager 2");
@@ -451,15 +485,15 @@ export default function HistoryClient() {
         const score1 = number(game.manager1_score);
         const score2 = number(game.manager2_score);
         const winner = score1 === score2 ? "Draw" : score1 > score2 ? club(manager1, "Manager 1") : club(manager2, "Manager 2");
-        return <article className="card historyGame" key={game.gameweek}>
+        return <Link className="card historyGame historyGameLink" href={`/history?gw=${game.gameweek}`} key={game.gameweek}>
           <div className="historyGameTop"><span className="eyebrow">Gameweek {game.gameweek}</span><span className="pill">{winner}</span></div>
           <div className="historyGameScore">
             <div><span>{club(manager1, "Manager 1")}</span><b>{score1}</b></div>
             <strong>–</strong>
             <div><span>{club(manager2, "Manager 2")}</span><b>{score2}</b></div>
           </div>
-          <div className="meta">Margin {Math.abs(score1 - score2)} · Combined {score1 + score2}</div>
-        </article>;
+          <div className="meta">Margin {Math.abs(score1 - score2)} · Combined {score1 + score2}</div><div className="historyViewRecap">View full recap <span aria-hidden="true">›</span></div>
+        </Link>;
       }) : <section className="card"><div className="emptyState"><div className="emptyIcon" aria-hidden="true">⚽</div><b>No completed Gameweeks yet</b><span>GW {activeGameweek || 4} will appear here automatically after official FPL data is checked and SoccerTime finalizes the result.</span></div></section>}
     </section>
   </main><BottomNav active="history" draftOpen={state?.draft?.status === "open"} /></>;

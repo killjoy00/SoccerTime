@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const BASE_URL = process.argv[2] || "https://soccertime.planitnow.us";
 const SELF_TEST = process.env.SOCCERTIME_SMOKE_SELF_TEST === "1";
-const PORT = 9337;
+const PORT = 9337 + (process.pid % 500);
 const USER_DATA_DIR = "/tmp/soccertime-mobile-smoke-" + process.pid;
 
 function findChrome() {
@@ -87,7 +87,7 @@ class CdpClient {
 }
 
 async function debugTargetUrl() {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     try {
       const response = await fetch("http://127.0.0.1:" + PORT + "/json/list");
       if (response.ok) {
@@ -172,7 +172,11 @@ const chromeProcess = spawn(chrome, [
   "--remote-debugging-port=" + PORT,
   "--user-data-dir=" + USER_DATA_DIR,
   "about:blank",
-], { stdio: "ignore" });
+], { stdio: ["ignore", "ignore", "pipe"] });
+let chromeDiagnostics = "";
+chromeProcess.stderr?.on("data", (chunk) => {
+  chromeDiagnostics = (chromeDiagnostics + String(chunk)).slice(-4000);
+});
 
 let client;
 try {
@@ -203,8 +207,40 @@ try {
       await assertMobileLayout(client, width, "/?tab=match", ".matchupRivalryPulse");
       await assertMobileLayout(client, width, "/?tab=league", ".fantasyLeagueTable");
       await assertMobileLayout(client, width, "/history", ".rivalryPulse");
+
+      const recap = await evaluate(client, "document.querySelector('.historyGameLink')?.getAttribute('href') || ''");
+      if (recap) {
+        await assertMobileLayout(client, width, recap, ".historyRecapHero");
+        const scores = await evaluate(client, "document.querySelectorAll('.historyRecapTeamPoints b').length");
+        if (scores !== 2) throw new Error("Historical recap is missing one side's final score at " + width + "px");
+      }
+
+      await assertMobileLayout(client, width, "/?tab=players", ".fantasyMarketList");
+      await waitForSelector(client, ".fantasyAddButton");
+      await evaluate(client, "document.querySelector('.fantasyAddButton').click();true");
+      await waitForSelector(client, ".swapModal");
+      await waitForSelector(client, ".swapDropOption");
+      const before = await evaluate(client, "document.querySelector('.swapModalActions .btn:last-child')?.disabled");
+      if (before !== true) throw new Error("Pickup confirmation must require a player to drop");
+
+      await evaluate(client, "document.querySelector('.swapDropOption input')?.click();true");
+      await sleep(250);
+      const swapState = await evaluate(client,
+        "({chosen:Boolean(document.querySelector('.swapDropOption.chosen'))," +
+        "locked:Boolean(document.querySelector('.swapModal .banner.error'))," +
+        "disabled:Boolean(document.querySelector('.swapModalActions .btn:last-child')?.disabled)," +
+        "scrollWidth:document.documentElement.scrollWidth,width:window.innerWidth})"
+      );
+      if (!swapState?.chosen && !swapState?.locked) throw new Error("Pickup drop selection did not update");
+      if (swapState?.chosen && !swapState?.locked && swapState.disabled) throw new Error("Valid pickup confirmation stayed disabled");
+      if (swapState.scrollWidth > swapState.width + 2) throw new Error("Swap modal overflows at " + width + "px");
+      // Do not click Confirm: no real roster mutation in a smoke test.
+      console.log("mobile smoke ok: " + width + "px free-agent drop selection (non-mutating)");
     }
   }
+} catch (error) {
+  console.error("Chrome smoke diagnostic:", chromeDiagnostics.slice(-2500) || "(no browser stderr)");
+  throw error;
 } finally {
   client?.close();
   chromeProcess.kill("SIGTERM");
