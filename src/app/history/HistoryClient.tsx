@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import BottomNav from "../BottomNav";
 import PlayerFace from "../PlayerFace";
 import { rpc } from "@/lib/neon";
+import { buildHistoricalLineups, type ArchivedMove, type ArchivedPick, type HistoricalLineups } from "@/lib/historical-lineups";
 
 type Manager = {
   id: string;
@@ -42,6 +43,7 @@ type LeagueState = {
   draft?: { round_no?: number; start_gameweek?: number; end_gameweek?: number; status?: string };
   managers?: Manager[];
   matchups?: Matchup[];
+  picks?: ArchivedPick[];
   round_results?: RoundResult[];
 };
 
@@ -125,8 +127,16 @@ function winnerForGame(game: Matchup, manager1?: Manager, manager2?: Manager) {
 export default function HistoryClient() {
   const [state, setState] = useState<LeagueState | null>(null);
   const [staticData, setStaticData] = useState<StaticData>({});
+  const [moves, setMoves] = useState<ArchivedMove[] | null>(null);
+  const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("gw");
+    const gw = raw ? Number(raw) : null;
+    if (gw !== null && Number.isInteger(gw) && gw >= 1 && gw <= 38) setSelectedGameweek(gw);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -140,9 +150,10 @@ export default function HistoryClient() {
         return;
       }
       try {
-        const [result, feed] = await Promise.all([
+        const [result, feed, moveResult] = await Promise.all([
           rpc("league_state", { p_code: code }),
           fetch("/data/epl.json", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).catch(() => null),
+          fetch(`/api/moves?code=${encodeURIComponent(code)}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null).catch(() => null),
         ]);
         if (!active) return;
         if (!result?.ok) setError(result?.error || "Could not load league history.");
@@ -151,6 +162,7 @@ export default function HistoryClient() {
           setError("");
         }
         if (feed) setStaticData(feed);
+        setMoves(moveResult?.ok && Array.isArray(moveResult.moves) ? moveResult.moves : null);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Could not load league history.");
       } finally {
