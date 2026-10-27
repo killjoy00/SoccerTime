@@ -45,8 +45,9 @@ export default function PickupSwapModal({
 }) {
   const dialog = useRef<HTMLElement>(null);
 
+  useEffect(() => { dialog.current?.focus(); }, []);
+
   useEffect(() => {
-    dialog.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !moving) onCancel();
     };
