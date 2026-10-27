@@ -203,6 +203,35 @@ try {
       await assertMobileLayout(client, width, "/?tab=match", ".matchupRivalryPulse");
       await assertMobileLayout(client, width, "/?tab=league", ".fantasyLeagueTable");
       await assertMobileLayout(client, width, "/history", ".rivalryPulse");
+
+      const recap = await evaluate(client, "document.querySelector('.historyGameLink')?.getAttribute('href') || ''");
+      if (recap) {
+        await assertMobileLayout(client, width, recap, ".historyRecapHero");
+        const scores = await evaluate(client, "document.querySelectorAll('.historyRecapTeamPoints b').length");
+        if (scores !== 2) throw new Error("Historical recap is missing one side's final score at " + width + "px");
+      }
+
+      await assertMobileLayout(client, width, "/?tab=players", ".fantasyMarketList");
+      await waitForSelector(client, ".fantasyAddButton");
+      await evaluate(client, "document.querySelector('.fantasyAddButton').click();true");
+      await waitForSelector(client, ".swapModal");
+      await waitForSelector(client, ".swapDropOption");
+      const before = await evaluate(client, "document.querySelector('.swapModalActions .btn:last-child')?.disabled");
+      if (before !== true) throw new Error("Pickup confirmation must require a player to drop");
+
+      await evaluate(client, "document.querySelector('.swapDropOption input')?.click();true");
+      await sleep(250);
+      const swapState = await evaluate(client,
+        "({chosen:Boolean(document.querySelector('.swapDropOption.chosen'))," +
+        "locked:Boolean(document.querySelector('.swapModal .banner.error'))," +
+        "disabled:Boolean(document.querySelector('.swapModalActions .btn:last-child')?.disabled)," +
+        "scrollWidth:document.documentElement.scrollWidth,width:window.innerWidth})"
+      );
+      if (!swapState?.chosen && !swapState?.locked) throw new Error("Pickup drop selection did not update");
+      if (swapState?.chosen && !swapState?.locked && swapState.disabled) throw new Error("Valid pickup confirmation stayed disabled");
+      if (swapState.scrollWidth > swapState.width + 2) throw new Error("Swap modal overflows at " + width + "px");
+      // Do not click Confirm: no real roster mutation in a smoke test.
+      console.log("mobile smoke ok: " + width + "px free-agent drop selection (non-mutating)");
     }
   }
 } finally {
