@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const BASE_URL = process.argv[2] || "https://soccertime.planitnow.us";
 const SELF_TEST = process.env.SOCCERTIME_SMOKE_SELF_TEST === "1";
-const PORT = 9337;
+const PORT = 9337 + (process.pid % 500);
 const USER_DATA_DIR = "/tmp/soccertime-mobile-smoke-" + process.pid;
 
 function findChrome() {
@@ -87,7 +87,7 @@ class CdpClient {
 }
 
 async function debugTargetUrl() {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     try {
       const response = await fetch("http://127.0.0.1:" + PORT + "/json/list");
       if (response.ok) {
@@ -172,7 +172,11 @@ const chromeProcess = spawn(chrome, [
   "--remote-debugging-port=" + PORT,
   "--user-data-dir=" + USER_DATA_DIR,
   "about:blank",
-], { stdio: "ignore" });
+], { stdio: ["ignore", "ignore", "pipe"] });
+let chromeDiagnostics = "";
+chromeProcess.stderr?.on("data", (chunk) => {
+  chromeDiagnostics = (chromeDiagnostics + String(chunk)).slice(-4000);
+});
 
 let client;
 try {
@@ -234,6 +238,9 @@ try {
       console.log("mobile smoke ok: " + width + "px free-agent drop selection (non-mutating)");
     }
   }
+} catch (error) {
+  console.error("Chrome smoke diagnostic:", chromeDiagnostics.slice(-2500) || "(no browser stderr)");
+  throw error;
 } finally {
   client?.close();
   chromeProcess.kill("SIGTERM");
